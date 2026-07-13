@@ -1,0 +1,15 @@
+.env
+*.log
+__pycache__/
+.venv/
+node_modules/
+dist/
+coverage/
+
+finetune/outputs/
+datasets/text_to_sql/*.jsonl
+!datasets/text_to_sql/sample.jsonl
+
+data/synthea_csv/*.csv
+data/synthea_csv/*.txt
+data/synthea_csv/*.json

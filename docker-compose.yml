@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: healthcare_text_to_sql_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-healthcare}
+      POSTGRES_USER: ${POSTGRES_USER:-healthcare_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-healthcare_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./data/synthea_csv:/data/synthea_csv:ro
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-healthcare_user} -d ${POSTGRES_DB:-healthcare}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

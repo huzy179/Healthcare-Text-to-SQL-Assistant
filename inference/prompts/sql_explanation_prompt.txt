@@ -1,0 +1,12 @@
+Explain the SQL result briefly in Vietnamese.
+
+Question:
+{{question}}
+
+SQL:
+{{sql}}
+
+Rows:
+{{rows}}
+
+Explanation:

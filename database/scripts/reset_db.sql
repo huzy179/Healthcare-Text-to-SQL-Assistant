@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS payers;
+DROP TABLE IF EXISTS organizations;
+DROP TABLE IF EXISTS providers;
+DROP TABLE IF EXISTS claims;
+DROP TABLE IF EXISTS procedures;
+DROP TABLE IF EXISTS observations;
+DROP TABLE IF EXISTS medications;
+DROP TABLE IF EXISTS conditions;
+DROP TABLE IF EXISTS encounters;
+DROP TABLE IF EXISTS patients;

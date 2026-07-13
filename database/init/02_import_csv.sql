@@ -1,0 +1,10 @@
+\copy patients FROM '/data/synthea_csv/patients.csv' WITH (FORMAT csv, HEADER true, NULL '');
+\copy encounters FROM '/data/synthea_csv/encounters.csv' WITH (FORMAT csv, HEADER true, NULL '');
+\copy conditions FROM '/data/synthea_csv/conditions.csv' WITH (FORMAT csv, HEADER true, NULL '');
+\copy medications FROM '/data/synthea_csv/medications.csv' WITH (FORMAT csv, HEADER true, NULL '');
+\copy observations FROM '/data/synthea_csv/observations.csv' WITH (FORMAT csv, HEADER true, NULL '');
+\copy procedures FROM '/data/synthea_csv/procedures.csv' WITH (FORMAT csv, HEADER true, NULL '');
+\copy claims FROM '/data/synthea_csv/claims.csv' WITH (FORMAT csv, HEADER true, NULL '');
+\copy providers FROM '/data/synthea_csv/providers.csv' WITH (FORMAT csv, HEADER true, NULL '');
+\copy organizations FROM '/data/synthea_csv/organizations.csv' WITH (FORMAT csv, HEADER true, NULL '');
+\copy payers FROM '/data/synthea_csv/payers.csv' WITH (FORMAT csv, HEADER true, NULL '');
