@@ -90,6 +90,8 @@ Chạy PostgreSQL:
 docker compose up -d postgres
 ```
 
+PostgreSQL được expose ở host port `5433` để tránh đụng các project khác đang dùng `5432`.
+
 Kiểm tra container:
 
 ```bash

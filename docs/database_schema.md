@@ -16,3 +16,10 @@ Core tables:
 - `payers`
 
 The initial schema is defined in `database/init/01_create_tables.sql`.
+
+Related planning docs:
+
+- `docs/data_inventory.md`
+- `docs/data_dictionary.md`
+- `docs/mvp_scope.md`
+- `docs/database_setup.md`
