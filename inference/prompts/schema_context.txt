@@ -1,0 +1,97 @@
+Use this PostgreSQL schema.
+
+Tables:
+
+patients(
+  id, birthdate, deathdate, first_name, middle_name, last_name,
+  gender, race, ethnicity, city, state, county, zip,
+  healthcare_expenses, healthcare_coverage, income
+)
+
+encounters(
+  id, start, stop, patient, organization, provider, payer,
+  encounterclass, code, description, base_encounter_cost,
+  total_claim_cost, payer_coverage, reasoncode, reasondescription
+)
+
+conditions(
+  start, stop, patient, encounter, system, code, description
+)
+
+medications(
+  start, stop, patient, payer, encounter, code, description,
+  base_cost, payer_coverage, dispenses, totalcost,
+  reasoncode, reasondescription
+)
+
+observations(
+  date, patient, encounter, category, code, description,
+  value, units, type
+)
+
+procedures(
+  start, stop, patient, encounter, system, code, description,
+  base_cost, reasoncode, reasondescription
+)
+
+claims(
+  id, patientid, providerid, primarypatientinsuranceid,
+  secondarypatientinsuranceid, departmentid, patientdepartmentid,
+  diagnosis1, diagnosis2, diagnosis3, diagnosis4, diagnosis5,
+  diagnosis6, diagnosis7, diagnosis8, referringproviderid,
+  appointmentid, currentillnessdate, servicedate,
+  supervisingproviderid, status1, status2, statusp,
+  outstanding1, outstanding2, outstandingp,
+  lastbilleddate1, lastbilleddate2, lastbilleddatep,
+  healthcareclaimtypeid1, healthcareclaimtypeid2
+)
+
+providers(
+  id, organization, name, gender, speciality, address,
+  city, state, zip, lat, lon, encounters, procedures
+)
+
+organizations(
+  id, name, address, city, state, zip, lat, lon,
+  phone, revenue, utilization
+)
+
+payers(
+  id, name, ownership, city, state_headquartered,
+  amount_covered, amount_uncovered, revenue,
+  covered_encounters, uncovered_encounters,
+  covered_medications, uncovered_medications,
+  covered_procedures, uncovered_procedures,
+  unique_customers, qols_avg, member_months
+)
+
+Relationships:
+
+- encounters.patient = patients.id
+- encounters.organization = organizations.id
+- encounters.provider = providers.id
+- encounters.payer = payers.id
+- conditions.patient = patients.id
+- conditions.encounter = encounters.id
+- medications.patient = patients.id
+- medications.encounter = encounters.id
+- medications.payer = payers.id
+- observations.patient = patients.id
+- observations.encounter = encounters.id
+- procedures.patient = patients.id
+- procedures.encounter = encounters.id
+- claims.patientid = patients.id
+- claims.providerid = providers.id
+- providers.organization = organizations.id
+
+Notes:
+
+- Use lowercase table and column names.
+- For patient names, use patients.first_name and patients.last_name.
+- For disease or diagnosis names, use conditions.description.
+- For medication names, use medications.description.
+- For procedure names, use procedures.description.
+- For observation names, use observations.description.
+- observations.value is text. Cast only after checking that it is numeric:
+  value ~ '^-?[0-9]+(\.[0-9]+)?$'
+- Prefer joining observations through patient unless encounter context is required.

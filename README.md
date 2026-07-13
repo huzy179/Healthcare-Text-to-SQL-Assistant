@@ -23,17 +23,17 @@ WHERE description ILIKE '%diabetes%'
 Đã có:
 
 - Raw healthcare CSV dataset.
-- Khung PostgreSQL import dữ liệu.
-- Sample SQL queries.
+- PostgreSQL Docker setup đã import 10 bảng MVP.
+- Sample SQL queries đã chạy được.
 - Prompt mẫu cho Text-to-SQL và explanation.
+- Baseline Text-to-SQL evaluation pipeline.
 - Backend NestJS skeleton cho endpoint Text-to-SQL.
 - Placeholder cho frontend, fine-tune và docs.
 
 Đang làm tiếp:
 
-- Dựng PostgreSQL bằng Docker.
-- Import CSV vào database.
-- Kiểm tra schema và sample queries.
+- Kết nối model LLM thật vào baseline evaluation.
+- Phân tích lỗi model và cải thiện prompt/schema context.
 - Xây baseline Text-to-SQL API trước khi fine-tune.
 
 ## Kiến Trúc
@@ -110,6 +110,12 @@ Chạy sample queries:
 docker compose exec -T postgres psql -U healthcare_user -d healthcare < database/scripts/sample_queries.sql
 ```
 
+Chạy baseline evaluation dry-run:
+
+```bash
+python3 scripts/run_baseline_eval.py --dry-run
+```
+
 Chạy backend:
 
 ```bash
@@ -151,7 +157,8 @@ healthcare-text-to-sql/
 │   └── README.md
 ├── datasets/
 │   └── text_to_sql/
-│       └── sample.jsonl
+│       ├── sample.jsonl
+│       └── eval_questions.jsonl
 ├── finetune/
 │   ├── configs/
 │   └── scripts/
@@ -163,6 +170,8 @@ healthcare-text-to-sql/
 │   └── package.json
 ├── frontend/
 ├── docs/
+├── reports/
+├── scripts/
 ├── docker-compose.yml
 ├── .env.example
 └── README.md
