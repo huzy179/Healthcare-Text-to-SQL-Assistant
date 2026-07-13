@@ -3,7 +3,7 @@
 ```text
 User
 -> Frontend
--> NestJS Backend
+-> Python FastAPI Backend
 -> Schema Service
 -> Prompt Builder
 -> vLLM or Base LLM

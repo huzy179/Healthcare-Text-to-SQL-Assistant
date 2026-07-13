@@ -27,7 +27,7 @@ WHERE description ILIKE '%diabetes%'
 - Sample SQL queries đã chạy được.
 - Prompt mẫu cho Text-to-SQL và explanation.
 - Baseline Text-to-SQL evaluation pipeline.
-- Backend NestJS skeleton cho endpoint Text-to-SQL.
+- Backend Python FastAPI skeleton cho endpoint Text-to-SQL.
 - Placeholder cho frontend, fine-tune và docs.
 
 Đang làm tiếp:
@@ -41,7 +41,7 @@ WHERE description ILIKE '%diabetes%'
 ```text
 User
 -> Frontend
--> NestJS Backend
+-> Python FastAPI Backend
 -> Schema Service
 -> Prompt Builder
 -> LLM / vLLM
@@ -120,8 +120,10 @@ Chạy backend:
 
 ```bash
 cd backend
-npm install
-npm run start:dev
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 3000
 ```
 
 Gọi API:
@@ -166,8 +168,8 @@ healthcare-text-to-sql/
 │   ├── prompts/
 │   └── vllm/
 ├── backend/
-│   ├── src/
-│   └── package.json
+│   ├── app/
+│   └── requirements.txt
 ├── frontend/
 ├── docs/
 ├── reports/
@@ -320,7 +322,7 @@ Các chỉ số nên đo:
 
 ### Phase 3: Backend
 
-- NestJS API skeleton.
+- Python FastAPI skeleton.
 - Schema prompt tĩnh ban đầu.
 - SQL validator cơ bản.
 - Query executor.
