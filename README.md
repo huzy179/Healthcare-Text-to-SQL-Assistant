@@ -1,57 +1,20 @@
-# Healthcare Text-to-SQL Assistant
+# Healthcare PostgreSQL MCP Server
 
-Healthcare Text-to-SQL Assistant cho phép người dùng hỏi dữ liệu y tế bằng tiếng Việt hoặc tiếng Anh, sau đó hệ thống sinh SQL an toàn, chạy trên PostgreSQL và trả kết quả phân tích.
+Project này cung cấp MCP server để LLM truy vấn dữ liệu y tế Synthea trong PostgreSQL bằng các database tools an toàn.
 
-Ví dụ:
-
-```text
-Có bao nhiêu bệnh nhân bị Diabetes trong năm 2026?
-```
-
-SQL kỳ vọng:
-
-```sql
-SELECT COUNT(DISTINCT patient) AS total_patients
-FROM conditions
-WHERE description ILIKE '%diabetes%'
-  AND start >= '2026-01-01'
-  AND start < '2027-01-01';
-```
-
-## Trạng Thái Hiện Tại
-
-Đã có:
-
-- Raw healthcare CSV dataset.
-- PostgreSQL Docker setup đã import 10 bảng MVP.
-- Sample SQL queries đã chạy được.
-- Prompt mẫu cho Text-to-SQL và explanation.
-- Baseline Text-to-SQL evaluation pipeline.
-- Backend Python FastAPI skeleton cho endpoint Text-to-SQL.
-- Placeholder cho frontend, fine-tune và docs.
-
-Đang làm tiếp:
-
-- Kết nối model LLM thật vào baseline evaluation.
-- Phân tích lỗi model và cải thiện prompt/schema context.
-- Xây baseline Text-to-SQL API trước khi fine-tune.
-
-## Kiến Trúc
+Luồng chính:
 
 ```text
 User
--> Frontend
--> Python FastAPI Backend
--> Schema Service
--> Prompt Builder
--> LLM / vLLM
--> SQL Validator
--> PostgreSQL
--> Result Formatter
--> Response
+-> LLM / MCP client
+-> Healthcare PostgreSQL MCP server
+-> SQL validation
+-> PostgreSQL readonly user
+-> Query result
+-> LLM summarizes answer
 ```
 
-MVP chưa cần fine-tune ngay. Hướng tốt nhất là làm baseline bằng prompt + schema trước, sau đó mới tạo dataset Question-SQL và fine-tune LoRA/QLoRA.
+MCP server không fine-tune model và không chạy FastAPI API riêng. LLM client sẽ tự gọi tools để xem schema, validate SQL và chạy query.
 
 ## Dataset
 
@@ -61,7 +24,7 @@ Dữ liệu nằm tại:
 data/synthea_csv
 ```
 
-Các bảng chính:
+Các bảng MVP:
 
 - `patients`: thông tin bệnh nhân.
 - `encounters`: lượt khám, cấp cứu, nhập viện, tái khám.
@@ -74,7 +37,7 @@ Các bảng chính:
 - `organizations`: bệnh viện, phòng khám, cơ sở y tế.
 - `payers`: bảo hiểm hoặc bên chi trả.
 
-`claims_transactions.csv` rất lớn nên chưa đưa vào MVP. Bảng này nên xử lý ở phase nâng cao sau khi database và use case chính đã ổn định.
+`claims_transactions.csv` và các bảng lớn/phụ trợ khác chưa nằm trong MVP.
 
 ## Quick Start
 
@@ -90,15 +53,9 @@ Chạy PostgreSQL:
 docker compose up -d postgres
 ```
 
-PostgreSQL được expose ở host port `5433` để tránh đụng các project khác đang dùng `5432`.
+PostgreSQL expose ở host port `5433`.
 
-Kiểm tra container:
-
-```bash
-docker compose ps
-```
-
-Kiểm tra số dòng ước lượng sau import:
+Kiểm tra số dòng:
 
 ```bash
 docker compose exec -T postgres psql -U healthcare_user -d healthcare < database/scripts/check_tables.sql
@@ -110,35 +67,99 @@ Chạy sample queries:
 docker compose exec -T postgres psql -U healthcare_user -d healthcare < database/scripts/sample_queries.sql
 ```
 
-Chạy baseline evaluation dry-run:
+Cài dependency MCP server:
 
 ```bash
-python3 scripts/run_baseline_eval.py --dry-run
-```
-
-Chạy backend:
-
-```bash
-cd backend
+cd mcp_server
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 3000
 ```
 
-Gọi API:
+Chạy MCP server bằng stdio:
 
 ```bash
-curl -X POST http://localhost:3000/text-to-sql/query \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Top 10 bệnh phổ biến nhất là gì?"}'
+python server.py
 ```
 
-Nếu cần import lại từ đầu:
+## MCP Tools
+
+Server hiện expose các tools:
+
+- `get_schema`: trả schema PostgreSQL, kiểu cột và join hints.
+- `validate_readonly_sql`: kiểm tra SQL có phải một câu `SELECT` an toàn không.
+- `check_sql_syntax`: dùng PostgreSQL `EXPLAIN` để kiểm tra cú pháp sau khi qua safety validation.
+- `run_readonly_query`: validate rồi chạy SQL bằng readonly DB user, có timeout và default row limit.
+- `explain_query_result`: sinh giải thích ngắn bằng tiếng Việt từ question, SQL và rows.
+- `ask_database`: trả lời một số câu hỏi phân tích phổ biến bằng SQL template cơ bản.
+
+Flow nên dùng với LLM:
+
+```text
+1. Gọi get_schema.
+2. Áp dụng schema-aware prompting để sinh PostgreSQL SELECT SQL.
+3. Gọi validate_readonly_sql.
+4. Gọi check_sql_syntax để PostgreSQL parse query.
+5. Nếu hợp lệ, gọi run_readonly_query.
+6. Dùng explanation trả về hoặc gọi explain_query_result.
+```
+
+## MCP Client Config
+
+Ví dụ cấu hình client dùng stdio:
+
+```json
+{
+  "mcpServers": {
+    "healthcare-postgres": {
+      "command": "python",
+      "args": ["/absolute/path/to/healthcare-text-to-sql/mcp_server/server.py"],
+      "env": {
+        "DATABASE_URL": "postgresql://healthcare_readonly:readonly_password@localhost:5433/healthcare",
+        "MCP_QUERY_TIMEOUT_MS": "30000",
+        "MCP_MAX_ROWS": "200"
+      }
+    }
+  }
+}
+```
+
+## Safety
+
+MCP server áp dụng các lớp bảo vệ:
+
+- Kết nối bằng `healthcare_readonly`.
+- Chỉ cho phép một statement bắt đầu bằng `SELECT`.
+- Chặn `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `TRUNCATE`, `COPY`, `GRANT`, `REVOKE`.
+- Chặn tên bảng ngoài 10 bảng MVP.
+- Kiểm tra cú pháp bằng PostgreSQL `EXPLAIN`.
+- Thêm default `LIMIT` nếu query chưa có limit.
+- Set PostgreSQL `statement_timeout` cho mỗi query.
+
+## Text-to-SQL Và Evaluation
+
+Pipeline chi tiết nằm ở:
+
+```text
+docs/text_to_sql_pipeline.md
+```
+
+Chạy evaluation dry-run bằng expected SQL:
 
 ```bash
-docker compose down -v
-docker compose up -d postgres
+python3 scripts/evaluate_text_to_sql.py
+```
+
+Script đo:
+
+- Exact Match Accuracy.
+- Execution Accuracy.
+- Average response time.
+
+Nếu có output SQL từ LLM/MCP client:
+
+```bash
+python3 scripts/evaluate_text_to_sql.py --generated-file outputs/generated_sql.jsonl
 ```
 
 ## Cấu Trúc Dự Án
@@ -149,57 +170,24 @@ healthcare-text-to-sql/
 │   └── synthea_csv/
 ├── database/
 │   ├── init/
-│   │   ├── 01_create_tables.sql
-│   │   ├── 02_import_csv.sql
-│   │   └── 03_create_indexes.sql
-│   ├── scripts/
-│   │   ├── check_tables.sql
-│   │   ├── sample_queries.sql
-│   │   └── reset_db.sql
-│   └── README.md
+│   └── scripts/
 ├── datasets/
 │   └── text_to_sql/
-│       ├── sample.jsonl
-│       └── eval_questions.jsonl
-├── finetune/
-│   ├── configs/
-│   └── scripts/
-├── inference/
-│   ├── prompts/
-│   └── vllm/
-├── backend/
-│   ├── app/
-│   └── requirements.txt
-├── frontend/
 ├── docs/
 ├── reports/
 ├── scripts/
+├── mcp_server/
+│   ├── server.py
+│   ├── database.py
+│   ├── sql_validator.py
+│   ├── config.py
+│   └── requirements.txt
 ├── docker-compose.yml
 ├── .env.example
 └── README.md
 ```
 
-## Text-to-SQL Pipeline
-
-```text
-Natural language question
--> Load relevant schema
--> Build prompt
--> Generate SQL
--> Validate SQL safety
--> Execute query on PostgreSQL
--> Format result table
--> Generate short explanation
-```
-
-Validator cần đảm bảo:
-
-- Chỉ cho phép `SELECT`.
-- Chặn `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `TRUNCATE`, `COPY`.
-- Chặn nhiều statement trong một lần chạy.
-- Kiểm tra tên bảng và tên cột có trong schema.
-- Thêm `LIMIT` mặc định cho query trả nhiều dòng.
-- Database user nên chỉ có quyền đọc.
+`datasets/text_to_sql` được giữ lại làm bộ câu hỏi tham chiếu để kiểm thử thủ công với MCP client.
 
 ## Ví Dụ SQL
 
@@ -231,128 +219,6 @@ GROUP BY year
 ORDER BY year;
 ```
 
-Bệnh nhân có nhiều chẩn đoán nhất:
+## Dọn Kiến Trúc Cũ
 
-```sql
-SELECT
-  p.id,
-  p.first_name,
-  p.last_name,
-  COUNT(c.code) AS total_conditions
-FROM patients p
-JOIN conditions c ON c.patient = p.id
-GROUP BY p.id, p.first_name, p.last_name
-ORDER BY total_conditions DESC
-LIMIT 10;
-```
-
-## Fine-Tuning
-
-Fine-tune dùng để giúp model học:
-
-- Schema healthcare CSV trong project.
-- Cách đặt tên bảng và cột.
-- SQL PostgreSQL đúng format.
-- Cách join các bảng healthcare.
-- Cách trả về SQL ngắn, an toàn, đúng yêu cầu.
-
-Dataset mẫu nằm ở:
-
-```text
-datasets/text_to_sql/sample.jsonl
-```
-
-Format đề xuất:
-
-```json
-{
-  "instruction": "Generate PostgreSQL SQL from the healthcare question and schema. Return only SQL.",
-  "schema": "patients(id, gender), conditions(patient, description, start)",
-  "question": "Top 10 bệnh phổ biến nhất là gì?",
-  "sql": "SELECT description, COUNT(*) AS total FROM conditions GROUP BY description ORDER BY total DESC LIMIT 10;"
-}
-```
-
-## vLLM
-
-Sau khi có model fine-tuned hoặc merged model, có thể serve bằng vLLM:
-
-```bash
-MODEL_PATH=./finetune/outputs/merged_model ./inference/vllm/serve.sh
-```
-
-Backend sẽ gọi OpenAI-compatible endpoint:
-
-```text
-POST /v1/chat/completions
-```
-
-## Evaluation
-
-Các chỉ số nên đo:
-
-- Execution accuracy.
-- SQL exact match.
-- Syntax error rate.
-- Schema error rate.
-- Safety violation rate.
-- Average latency.
-- Tokens per second.
-- Successful query rate.
-
-`Execution accuracy` là quan trọng nhất vì nhiều câu SQL khác nhau vẫn có thể trả cùng kết quả đúng.
-
-## Roadmap
-
-### Phase 1: Database
-
-- Dựng PostgreSQL bằng Docker.
-- Tạo bảng.
-- Import CSV.
-- Tạo index.
-- Viết sample queries.
-
-### Phase 2: Baseline Text-to-SQL
-
-- Tạo prompt.
-- Gọi base LLM.
-- Sinh SQL.
-- Validate SQL.
-- Execute query.
-
-### Phase 3: Backend
-
-- Python FastAPI skeleton.
-- Schema prompt tĩnh ban đầu.
-- SQL validator cơ bản.
-- Query executor.
-- Result formatter.
-- Nâng cấp schema service động từ PostgreSQL metadata.
-
-### Phase 4: Dataset Fine-Tune
-
-- Viết 300-500 question-SQL pairs.
-- Tách train/validation/test.
-- Chuẩn hóa JSONL.
-- Đánh giá trên test set.
-
-### Phase 5: Fine-Tune Và vLLM
-
-- Fine-tune LoRA/QLoRA.
-- Serve bằng vLLM.
-- Benchmark latency/throughput.
-- So sánh base model và fine-tuned model.
-
-### Phase 6: UI Demo
-
-- Chat interface.
-- Hiển thị generated SQL.
-- Hiển thị result table.
-- Hiển thị explanation.
-- Lưu lịch sử câu hỏi.
-
-## CV Summary
-
-```text
-Built a Healthcare Text-to-SQL Assistant that converts natural language questions into PostgreSQL queries, validates SQL safety, executes queries on a healthcare CSV-based PostgreSQL database, and returns analytics results with explanations. The system is designed for fine-tuned LLM inference with vLLM and evaluated using execution accuracy.
-```
+Các phần FastAPI backend, frontend placeholder, fine-tune/vLLM và baseline eval runner đã được bỏ khỏi runtime vì kiến trúc mới để LLM gọi database tools qua MCP.

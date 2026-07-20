@@ -2,15 +2,13 @@
 
 ```text
 User
--> Frontend
--> Python FastAPI Backend
--> Schema Service
--> Prompt Builder
--> vLLM or Base LLM
+-> LLM / MCP client
+-> Healthcare PostgreSQL MCP server
+-> get_schema / validate_readonly_sql / run_readonly_query
 -> SQL Validator
 -> PostgreSQL
--> Result Formatter
--> Response
+-> Query result
+-> LLM summary
 ```
 
-The MVP can use a base LLM with schema prompting before any fine-tuning work.
+The MCP server is the runtime boundary. It does not serve a chat API, host a model, or fine-tune a model. A regular LLM client calls MCP tools, writes PostgreSQL `SELECT` queries, and summarizes the returned rows.
