@@ -1,0 +1,65 @@
+{
+  "users": [
+    {
+      "id": "u001",
+      "username": "admin",
+      "display_name": "System Admin",
+      "role": "admin",
+      "description": "Can read all MVP healthcare tables."
+    },
+    {
+      "id": "u002",
+      "username": "staff",
+      "display_name": "Clinic Staff",
+      "role": "staff",
+      "description": "Can read patient demographics and clinical care tables, but not claims or payer finance tables."
+    },
+    {
+      "id": "u003",
+      "username": "user",
+      "display_name": "Basic User",
+      "role": "user",
+      "description": "Can read aggregate-friendly operational tables, with no direct access to patient identity fields."
+    }
+  ],
+  "roles": {
+    "admin": {
+      "allowed_tables": ["*"],
+      "denied_columns": {}
+    },
+    "staff": {
+      "allowed_tables": [
+        "patients",
+        "encounters",
+        "conditions",
+        "medications",
+        "observations",
+        "procedures",
+        "providers",
+        "organizations"
+      ],
+      "denied_columns": {
+        "patients": ["ssn", "drivers", "passport"],
+        "claims": ["*"],
+        "payers": ["*"]
+      }
+    },
+    "user": {
+      "allowed_tables": [
+        "encounters",
+        "conditions",
+        "medications",
+        "observations",
+        "procedures",
+        "providers",
+        "organizations",
+        "payers"
+      ],
+      "denied_columns": {
+        "patients": ["*"],
+        "claims": ["*"]
+      }
+    }
+  },
+  "default_user_id": "u003"
+}

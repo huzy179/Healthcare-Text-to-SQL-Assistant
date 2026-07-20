@@ -84,6 +84,16 @@ python server.py
 
 ## Docker
 
+Các lệnh Docker phổ biến đã được gom trong `Makefile`:
+
+```bash
+make setup
+make up
+make build
+make check-tables
+make eval
+```
+
 Build MCP image:
 
 ```bash
@@ -115,6 +125,7 @@ Vì MCP server dùng `stdio`, service này không expose HTTP port. MCP client n
 Server hiện expose các tools:
 
 - `get_schema`: trả schema PostgreSQL, kiểu cột và join hints.
+- `get_users`: trả danh sách user/role tạm để test phân quyền đọc.
 - `validate_readonly_sql`: kiểm tra SQL có phải một câu `SELECT` an toàn không.
 - `check_sql_syntax`: dùng PostgreSQL `EXPLAIN` để kiểm tra cú pháp sau khi qua safety validation.
 - `run_readonly_query`: validate rồi chạy SQL bằng readonly DB user, có timeout và default row limit.
@@ -188,6 +199,7 @@ MCP server áp dụng các lớp bảo vệ:
 - Chỉ cho phép một statement bắt đầu bằng `SELECT`.
 - Chặn `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `TRUNCATE`, `COPY`, `GRANT`, `REVOKE`.
 - Chặn tên bảng ngoài 10 bảng MVP.
+- Chặn query vào bảng user không được phép đọc theo `mcp_server/users.json`.
 - Kiểm tra cú pháp bằng PostgreSQL `EXPLAIN`.
 - Thêm default `LIMIT` nếu query chưa có limit.
 - Set PostgreSQL `statement_timeout` cho mỗi query.

@@ -4,6 +4,7 @@ from mcp.server.fastmcp import FastMCP
 
 from config import get_settings
 from database import Database
+from permissions import can_read_sql, filter_schema_for_user, list_users
 from sql_validator import add_default_limit, validate_sql
 
 
@@ -41,18 +42,32 @@ def compact_schema(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 @mcp.tool()
-def get_schema() -> dict[str, Any]:
-    """Return PostgreSQL tables, columns, types, and common join hints."""
-    return compact_schema(database.schema())
+def get_users() -> dict[str, Any]:
+    """Return temporary test users and their roles."""
+    return {"users": list_users()}
 
 
 @mcp.tool()
-def validate_readonly_sql(sql: str) -> dict[str, Any]:
+def get_schema(user_id: str | None = None) -> dict[str, Any]:
+    """Return PostgreSQL tables, columns, types, and common join hints allowed for a user."""
+    schema = compact_schema(database.schema())
+    return filter_schema_for_user(user_id, schema)
+
+
+@mcp.tool()
+def validate_readonly_sql(sql: str, user_id: str | None = None) -> dict[str, Any]:
     """Validate that SQL is a safe single-statement SELECT over MVP healthcare tables."""
     is_valid, normalized_sql, validation_error = validate_sql(sql)
+    if is_valid:
+        is_allowed, permission_error = can_read_sql(user_id, normalized_sql)
+        if not is_allowed:
+            is_valid = False
+            validation_error = permission_error
+
     limited_sql = add_default_limit(normalized_sql, settings.max_rows) if is_valid else normalized_sql
     return {
         "is_valid": is_valid,
+        "user_id": user_id,
         "sql": normalized_sql,
         "limited_sql": limited_sql,
         "error": validation_error,
@@ -61,21 +76,24 @@ def validate_readonly_sql(sql: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def check_sql_syntax(sql: str) -> dict[str, Any]:
+def check_sql_syntax(sql: str, user_id: str | None = None) -> dict[str, Any]:
     """Validate safety rules and ask PostgreSQL to parse the query with EXPLAIN."""
-    is_valid, normalized_sql, validation_error = validate_sql(sql)
-    if not is_valid:
+    validation = validate_readonly_sql(sql, user_id)
+    if not validation["is_valid"]:
         return {
             "ok": False,
-            "sql": normalized_sql,
-            "error": validation_error,
+            "user_id": user_id,
+            "sql": validation["sql"],
+            "error": validation["error"],
         }
 
+    normalized_sql = validation["sql"]
     try:
         database.query("EXPLAIN " + normalized_sql)
     except Exception as error:  # noqa: BLE001
         return {
             "ok": False,
+            "user_id": user_id,
             "sql": normalized_sql,
             "error": "syntax_error",
             "detail": str(error),
@@ -83,29 +101,33 @@ def check_sql_syntax(sql: str) -> dict[str, Any]:
 
     return {
         "ok": True,
+        "user_id": user_id,
         "sql": normalized_sql,
         "error": None,
     }
 
 
 @mcp.tool()
-def run_readonly_query(sql: str) -> dict[str, Any]:
+def run_readonly_query(sql: str, user_id: str | None = None) -> dict[str, Any]:
     """Validate and run a read-only PostgreSQL SELECT query with a default row limit."""
-    is_valid, normalized_sql, validation_error = validate_sql(sql)
-    if not is_valid:
+    validation = validate_readonly_sql(sql, user_id)
+    if not validation["is_valid"]:
         return {
             "ok": False,
-            "sql": normalized_sql,
-            "error": validation_error,
+            "user_id": user_id,
+            "sql": validation["sql"],
+            "error": validation["error"],
             "rows": [],
             "row_count": 0,
         }
 
+    normalized_sql = validation["sql"]
     limited_sql = add_default_limit(normalized_sql, settings.max_rows)
     rows = database.query(limited_sql)
     explanation = explain_rows(rows)
     return {
         "ok": True,
+        "user_id": user_id,
         "sql": limited_sql,
         "rows": rows,
         "row_count": len(rows),
@@ -115,10 +137,10 @@ def run_readonly_query(sql: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def ask_database(question: str) -> dict[str, Any]:
+def ask_database(question: str, user_id: str | None = None) -> dict[str, Any]:
     """Answer common healthcare analytics questions with safe SQL templates."""
     sql = fallback_sql(question)
-    result = run_readonly_query(sql)
+    result = run_readonly_query(sql, user_id)
     result["question"] = question
     return result
 
