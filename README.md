@@ -134,7 +134,14 @@ Mở:
 http://localhost:3000
 ```
 
-Frontend hiện là demo console cho Text-to-SQL: chọn role `admin`, `staff`, `user`, nhập câu hỏi, xem SQL sinh ra, kết quả truy vấn, lỗi phân quyền và giải thích ngắn.
+Frontend hiện là demo console cho Text-to-SQL:
+
+- Chọn role `admin`, `staff`, `user`.
+- Xem schema được phép đọc theo role.
+- Chạy câu hỏi tự nhiên với SQL template demo.
+- Chạy SQL thủ công để test RBAC bảng/cột.
+- Xem SQL, kết quả truy vấn, lỗi phân quyền, thời gian phản hồi và giải thích ngắn.
+- Lưu lịch sử truy vấn gần nhất trong phiên trình duyệt.
 
 ## MCP Tools
 

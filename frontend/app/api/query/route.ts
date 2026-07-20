@@ -6,24 +6,26 @@ import { addDefaultLimit, generateSql, validateSql } from "@/lib/sql";
 import { canReadSql } from "@/lib/users";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { question?: string; userId?: string };
+  const body = (await request.json()) as { mode?: "question" | "sql"; question?: string; sql?: string; userId?: string };
+  const mode = body.mode || "question";
   const question = body.question?.trim() || "";
   const userId = body.userId || "user";
 
-  if (!question) {
+  if (mode === "question" && !question) {
     return NextResponse.json(
-      { ok: false, error: "question_required", question, userId, sql: "", rows: [], rowCount: 0 },
+      { ok: false, error: "question_required", question, userId, mode, sql: "", rows: [], rowCount: 0 },
       { status: 400 },
     );
   }
 
-  const generatedSql = generateSql(question);
+  const generatedSql = mode === "sql" ? body.sql?.trim() || "" : generateSql(question);
   const validation = validateSql(generatedSql);
   if (!validation.ok) {
     return NextResponse.json({
       ok: false,
       question,
       userId,
+      mode,
       sql: validation.sql,
       rows: [],
       rowCount: 0,
@@ -38,6 +40,7 @@ export async function POST(request: Request) {
       ok: false,
       question,
       userId,
+      mode,
       sql: validation.sql,
       rows: [],
       rowCount: 0,
@@ -53,6 +56,7 @@ export async function POST(request: Request) {
       ok: true,
       question,
       userId,
+      mode,
       sql: limitedSql,
       rows,
       rowCount: rows.length,
@@ -64,6 +68,7 @@ export async function POST(request: Request) {
       ok: false,
       question,
       userId,
+      mode,
       sql: validation.sql,
       rows: [],
       rowCount: 0,
