@@ -82,6 +82,34 @@ Chạy MCP server bằng stdio:
 python server.py
 ```
 
+## Docker
+
+Build MCP image:
+
+```bash
+docker compose build mcp-server
+```
+
+Chạy PostgreSQL bằng Docker:
+
+```bash
+docker compose up -d postgres
+```
+
+Chạy evaluation trong Docker:
+
+```bash
+docker compose run --rm eval
+```
+
+Chạy MCP server qua Docker Compose:
+
+```bash
+docker compose run --rm -T mcp-server
+```
+
+Vì MCP server dùng `stdio`, service này không expose HTTP port. MCP client nên gọi command Docker Compose thay vì gọi URL.
+
 ## MCP Tools
 
 Server hiện expose các tools:
@@ -122,6 +150,34 @@ Ví dụ cấu hình client dùng stdio:
     }
   }
 }
+```
+
+Ví dụ cấu hình MCP client dùng Docker Compose:
+
+```json
+{
+  "mcpServers": {
+    "healthcare-postgres": {
+      "command": "docker",
+      "args": [
+        "compose",
+        "-f",
+        "/home/huy/workspace/healthcare-text-to-sql/docker-compose.yml",
+        "run",
+        "--rm",
+        "-T",
+        "mcp-server"
+      ]
+    }
+  }
+}
+```
+
+Trước khi dùng config Docker này, chạy:
+
+```bash
+docker compose up -d postgres
+docker compose build mcp-server
 ```
 
 ## Safety

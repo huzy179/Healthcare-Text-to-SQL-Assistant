@@ -19,5 +19,37 @@ services:
       timeout: 5s
       retries: 5
 
+  mcp-server:
+    build:
+      context: .
+      dockerfile: mcp_server/Dockerfile
+    container_name: healthcare_text_to_sql_mcp
+    profiles:
+      - mcp
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_READONLY_USER:-healthcare_readonly}:${POSTGRES_READONLY_PASSWORD:-readonly_password}@postgres:5432/${POSTGRES_DB:-healthcare}
+      MCP_QUERY_TIMEOUT_MS: ${MCP_QUERY_TIMEOUT_MS:-30000}
+      MCP_MAX_ROWS: ${MCP_MAX_ROWS:-200}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stdin_open: true
+    tty: false
+
+  eval:
+    build:
+      context: .
+      dockerfile: mcp_server/Dockerfile
+    profiles:
+      - eval
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_READONLY_USER:-healthcare_readonly}:${POSTGRES_READONLY_PASSWORD:-readonly_password}@postgres:5432/${POSTGRES_DB:-healthcare}
+      MCP_QUERY_TIMEOUT_MS: ${MCP_QUERY_TIMEOUT_MS:-30000}
+      MCP_MAX_ROWS: ${MCP_MAX_ROWS:-200}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "scripts/evaluate_text_to_sql.py"]
+
 volumes:
   postgres_data:
