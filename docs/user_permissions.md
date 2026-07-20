@@ -45,6 +45,7 @@ Permission errors use this format:
 
 ```text
 permission_denied_table:patients
+permission_denied_column:patients.ssn
 ```
 
 ## Current Role Rules
@@ -58,6 +59,7 @@ permission_denied_table:patients
 - Can read `patients`, `encounters`, `conditions`, `medications`, `observations`, `procedures`, `providers`, `organizations`.
 - Cannot read `claims` or `payers`.
 - Hidden patient identity columns in schema: `ssn`, `drivers`, `passport`.
+- Queries selecting hidden columns are blocked, including `SELECT * FROM patients`.
 
 `user`
 

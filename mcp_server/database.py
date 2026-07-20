@@ -9,13 +9,13 @@ from psycopg.rows import dict_row
 class Database:
     def __init__(self, database_url: str, query_timeout_ms: int) -> None:
         self.database_url = database_url
-        self.query_timeout_ms = query_timeout_ms
+        self.query_timeout_ms = int(query_timeout_ms)
 
     def query(self, sql: str) -> list[dict[str, Any]]:
         with psycopg.connect(self.database_url, row_factory=dict_row) as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SET TRANSACTION READ ONLY")
-                cursor.execute("SET LOCAL statement_timeout = %s", (self.query_timeout_ms,))
+                cursor.execute(f"SET LOCAL statement_timeout = {self.query_timeout_ms}")
                 cursor.execute(sql)
                 rows = cursor.fetchall()
         return [json_safe(dict(row)) for row in rows]

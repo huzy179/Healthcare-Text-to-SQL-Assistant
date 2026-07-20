@@ -64,7 +64,7 @@ postgresql://healthcare_readonly:readonly_password@localhost:5433/healthcare
 Use:
 
 ```bash
-python3 scripts/evaluate_text_to_sql.py
+python3 scripts/evaluate_text_to_sql.py --user-id admin
 ```
 
 Metrics:
@@ -76,7 +76,7 @@ Metrics:
 For generated SQL from an external LLM/MCP client, pass a JSONL file:
 
 ```bash
-python3 scripts/evaluate_text_to_sql.py --generated-file outputs/generated_sql.jsonl
+python3 scripts/evaluate_text_to_sql.py --user-id admin --generated-file outputs/generated_sql.jsonl
 ```
 
 Expected generated file format:

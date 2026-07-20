@@ -46,10 +46,33 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_READONLY_USER:-healthcare_readonly}:${POSTGRES_READONLY_PASSWORD:-readonly_password}@postgres:5432/${POSTGRES_DB:-healthcare}
       MCP_QUERY_TIMEOUT_MS: ${MCP_QUERY_TIMEOUT_MS:-30000}
       MCP_MAX_ROWS: ${MCP_MAX_ROWS:-200}
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ./reports:/app/reports
+      - ./outputs:/app/outputs
     command: ["python", "scripts/evaluate_text_to_sql.py"]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: healthcare_text_to_sql_frontend
+    profiles:
+      - frontend
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_READONLY_USER:-healthcare_readonly}:${POSTGRES_READONLY_PASSWORD:-readonly_password}@postgres:5432/${POSTGRES_DB:-healthcare}
+      MCP_QUERY_TIMEOUT_MS: ${MCP_QUERY_TIMEOUT_MS:-30000}
+      MCP_MAX_ROWS: ${MCP_MAX_ROWS:-200}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
 
 volumes:
   postgres_data:

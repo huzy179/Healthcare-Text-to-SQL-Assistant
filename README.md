@@ -92,6 +92,7 @@ make up
 make build
 make check-tables
 make eval
+make frontend
 ```
 
 Build MCP image:
@@ -119,6 +120,21 @@ docker compose run --rm -T mcp-server
 ```
 
 Vì MCP server dùng `stdio`, service này không expose HTTP port. MCP client nên gọi command Docker Compose thay vì gọi URL.
+
+Chạy giao diện Next.js:
+
+```bash
+make build-frontend
+make frontend
+```
+
+Mở:
+
+```text
+http://localhost:3000
+```
+
+Frontend hiện là demo console cho Text-to-SQL: chọn role `admin`, `staff`, `user`, nhập câu hỏi, xem SQL sinh ra, kết quả truy vấn, lỗi phân quyền và giải thích ngắn.
 
 ## MCP Tools
 
@@ -227,7 +243,7 @@ Script đo:
 Nếu có output SQL từ LLM/MCP client:
 
 ```bash
-python3 scripts/evaluate_text_to_sql.py --generated-file outputs/generated_sql.jsonl
+python3 scripts/evaluate_text_to_sql.py --user-id admin --generated-file outputs/generated_sql.jsonl
 ```
 
 ## Cấu Trúc Dự Án
@@ -242,6 +258,7 @@ healthcare-text-to-sql/
 ├── datasets/
 │   └── text_to_sql/
 ├── docs/
+├── frontend/
 ├── reports/
 ├── scripts/
 ├── mcp_server/

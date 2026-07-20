@@ -49,11 +49,23 @@ def normalize_sql_for_exact_match(sql: str) -> str:
     return normalized.lower()
 
 
-def execute(database: Any, sql: str, max_rows: int, validate_sql: Any, add_default_limit: Any) -> tuple[bool, str | None, list[dict[str, Any]], int]:
+def execute(
+    database: Any,
+    sql: str,
+    max_rows: int,
+    user_id: str,
+    validate_sql: Any,
+    add_default_limit: Any,
+    can_read_sql: Any,
+) -> tuple[bool, str | None, list[dict[str, Any]], int]:
     started = time.time()
     is_valid, normalized_sql, validation_error = validate_sql(sql)
     if not is_valid:
         return False, validation_error, [], int((time.time() - started) * 1000)
+
+    is_allowed, permission_error = can_read_sql(user_id, normalized_sql)
+    if not is_allowed:
+        return False, permission_error, [], int((time.time() - started) * 1000)
 
     try:
         rows = database.query(add_default_limit(normalized_sql, max_rows))
@@ -130,9 +142,11 @@ def main() -> int:
     parser.add_argument("--generated-file", type=Path)
     parser.add_argument("--output-file", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--summary-file", type=Path, default=DEFAULT_SUMMARY)
+    parser.add_argument("--user-id", default="admin")
     args = parser.parse_args()
 
     from database import Database  # noqa: PLC0415
+    from permissions import can_read_sql  # noqa: PLC0415
     from sql_validator import add_default_limit, validate_sql  # noqa: PLC0415
 
     database_url = os.getenv(
@@ -154,29 +168,35 @@ def main() -> int:
             database,
             item["expected_sql"],
             max_rows,
+            args.user_id,
             validate_sql,
             add_default_limit,
+            can_read_sql,
         )
         generated_ok, generated_error, generated_rows, latency_ms = execute(
             database,
             generated_sql,
             max_rows,
+            args.user_id,
             validate_sql,
             add_default_limit,
+            can_read_sql,
         )
 
-        is_valid, _, validation_error = validate_sql(generated_sql)
+        is_valid, normalized_sql, validation_error = validate_sql(generated_sql)
+        is_allowed, permission_error = can_read_sql(args.user_id, normalized_sql) if is_valid else (False, None)
         result = {
             "id": item["id"],
             "category": item["category"],
             "question": item["question"],
             "expected_sql": item["expected_sql"],
             "generated_sql": generated_sql,
-            "is_valid_sql": is_valid,
+            "user_id": args.user_id,
+            "is_valid_sql": is_valid and is_allowed,
             "exact_match": normalize_sql_for_exact_match(item["expected_sql"])
             == normalize_sql_for_exact_match(generated_sql),
             "execution_match": expected_ok and generated_ok and expected_rows == generated_rows,
-            "error": validation_error or generated_error or expected_error,
+            "error": validation_error or permission_error or generated_error or expected_error,
             "expected_row_count": len(expected_rows),
             "generated_row_count": len(generated_rows),
             "latency_ms": latency_ms,

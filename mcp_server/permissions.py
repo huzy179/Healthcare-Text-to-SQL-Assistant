@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from sql_validator import referenced_tables
+from sql_validator import referenced_columns, referenced_stars, referenced_tables
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -58,7 +58,42 @@ def can_read_sql(user_id: str | None, sql: str) -> tuple[bool, str | None]:
     if blocked:
         return False, "permission_denied_table:" + ",".join(blocked)
 
+    blocked_columns = denied_columns_in_sql(user["role"], sql)
+    if blocked_columns:
+        return False, "permission_denied_column:" + ",".join(blocked_columns)
+
     return True, None
+
+
+def denied_columns_in_sql(role: str, sql: str) -> list[str]:
+    denied_columns = role_policy(role).get("denied_columns", {})
+    if not denied_columns:
+        return []
+
+    tables = referenced_tables(sql)
+    columns = referenced_columns(sql)
+    stars = referenced_stars(sql)
+    blocked: set[str] = set()
+
+    for table_name in tables:
+        denied = set(denied_columns.get(table_name, []))
+        if not denied:
+            continue
+
+        if "*" in denied:
+            blocked.add(f"{table_name}.*")
+            continue
+
+        if None in stars or table_name in stars:
+            blocked.update(f"{table_name}.{column}" for column in denied)
+
+        for column_table, column_name in columns:
+            if column_table == table_name and column_name in denied:
+                blocked.add(f"{table_name}.{column_name}")
+            if column_table is None and column_name in denied:
+                blocked.add(f"{table_name}.{column_name}")
+
+    return sorted(blocked)
 
 
 def filter_schema_for_user(user_id: str | None, schema: dict[str, Any]) -> dict[str, Any]:

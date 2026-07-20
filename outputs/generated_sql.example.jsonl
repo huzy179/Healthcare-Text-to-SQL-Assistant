@@ -1,0 +1,2 @@
+{"id":"q001","generated_sql":"SELECT COUNT(*) AS total_patients FROM patients;"}
+{"id":"q002","generated_sql":"SELECT gender, COUNT(*) AS total FROM patients GROUP BY gender ORDER BY total DESC;"}
