@@ -85,8 +85,11 @@ services:
     profiles:
       - vllm
     ipc: host
+    shm_size: 8g
     environment:
       HF_TOKEN: ${HF_TOKEN:-}
+      VLLM_WSL2_ENABLE_PIN_MEMORY: ${VLLM_WSL2_ENABLE_PIN_MEMORY:-1}
+      VLLM_WEIGHT_OFFLOADING_DISABLE_UVA: ${VLLM_WEIGHT_OFFLOADING_DISABLE_UVA:-1}
     volumes:
       - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
     ports:
@@ -110,6 +113,7 @@ services:
       - ${VLLM_MAX_MODEL_LEN:-8192}
       - --gpu-memory-utilization
       - ${VLLM_GPU_MEMORY_UTILIZATION:-0.85}
+      - --enforce-eager
     deploy:
       resources:
         reservations:
