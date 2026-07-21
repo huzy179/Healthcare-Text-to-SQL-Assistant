@@ -1,7 +1,7 @@
 import { loadPolicy, getUser } from "./users";
 import type { VisibleSchema } from "./types";
 
-const schema: Record<string, { name: string; type: string }[]> = {
+const schema: Record<string, { name: string; type: string; notes?: string }[]> = {
   patients: [
     { name: "id", type: "text" },
     { name: "birthdate", type: "date" },
@@ -11,7 +11,7 @@ const schema: Record<string, { name: string; type: string }[]> = {
     { name: "passport", type: "text" },
     { name: "first_name", type: "text" },
     { name: "last_name", type: "text" },
-    { name: "gender", type: "text" },
+    { name: "gender", type: "text", notes: "Synthea uses coded values: M = male/nam, F = female/nu." },
     { name: "race", type: "text" },
     { name: "ethnicity", type: "text" },
     { name: "city", type: "text" },

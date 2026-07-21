@@ -33,6 +33,7 @@ export async function generateSqlWithLlm(question: string, userId: string): Prom
     "- Use only visible tables and columns from the schema.",
     "- Prefer aggregate queries and add LIMIT for ranked/list outputs.",
     "- Use COUNT(DISTINCT patient) when asking how many patients had a condition/event.",
+    "- For patients.gender, use Synthea codes: male/nam = 'M', female/nu = 'F'. Never use 'male' or 'female'.",
     "- observations.value is text; cast only after checking it is numeric.",
     "- Return compact JSON only, for example {\"sql\":\"SELECT ...\",\"reasoning\":\"...\"}.",
   ].join("\n");
@@ -41,7 +42,7 @@ export async function generateSqlWithLlm(question: string, userId: string): Prom
     const completion = await client.chat.completions.create({
       model,
       temperature: 0,
-      max_tokens: 700,
+      max_tokens: Number(process.env.LLM_MAX_TOKENS ?? "256"),
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

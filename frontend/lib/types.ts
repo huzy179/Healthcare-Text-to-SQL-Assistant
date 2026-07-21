@@ -22,7 +22,7 @@ export type QueryResponse = {
 
 export type VisibleSchema = {
   user: DemoUser | null;
-  tables: Record<string, { name: string; type: string }[]>;
+  tables: Record<string, { name: string; type: string; notes?: string }[]>;
   join_hints: string[];
   error?: string;
 };
