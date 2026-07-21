@@ -65,6 +65,11 @@ services:
     environment:
       HOSTNAME: 0.0.0.0
       PORT: 3000
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
       DATABASE_URL: postgresql://${POSTGRES_READONLY_USER:-healthcare_readonly}:${POSTGRES_READONLY_PASSWORD:-readonly_password}@postgres:5432/${POSTGRES_DB:-healthcare}
       MCP_QUERY_TIMEOUT_MS: ${MCP_QUERY_TIMEOUT_MS:-30000}
       MCP_MAX_ROWS: ${MCP_MAX_ROWS:-200}
@@ -73,6 +78,45 @@ services:
         condition: service_healthy
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: healthcare_text_to_sql_vllm
+    profiles:
+      - vllm
+    ipc: host
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
+    ports:
+      - "${VLLM_PORT:-8000}:8000"
+    command:
+      - --model
+      - ${VLLM_MODEL:-Qwen/Qwen2.5-Coder-3B-Instruct}
+      - --served-model-name
+      - ${VLLM_SERVED_MODEL_NAME:-qwen-coder-3b}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --dtype
+      - auto
+      - --api-key
+      - ${VLLM_API_KEY:-local}
+      - --generation-config
+      - vllm
+      - --max-model-len
+      - ${VLLM_MAX_MODEL_LEN:-8192}
+      - --gpu-memory-utilization
+      - ${VLLM_GPU_MEMORY_UTILIZATION:-0.85}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
 volumes:
   postgres_data:

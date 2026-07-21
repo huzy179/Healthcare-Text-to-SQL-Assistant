@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { runQuery } from "@/lib/db";
 import { explainRows } from "@/lib/explain";
-import { addDefaultLimit, generateSql, validateSql } from "@/lib/sql";
+import { generateSqlWithLlm } from "@/lib/llm";
+import { addDefaultLimit, validateSql } from "@/lib/sql";
 import { canReadSql } from "@/lib/users";
 
 export async function POST(request: Request) {
@@ -18,7 +19,27 @@ export async function POST(request: Request) {
     );
   }
 
-  const generatedSql = mode === "sql" ? body.sql?.trim() || "" : generateSql(question);
+  let generatedSql = body.sql?.trim() || "";
+  let modelReasoning = "";
+  if (mode === "question") {
+    try {
+      const generated = await generateSqlWithLlm(question, userId);
+      generatedSql = generated.sql;
+      modelReasoning = generated.reasoning;
+    } catch (error) {
+      return NextResponse.json({
+        ok: false,
+        question,
+        userId,
+        mode,
+        sql: "",
+        rows: [],
+        rowCount: 0,
+        explanation: "",
+        error: error instanceof Error ? error.message : "llm_generation_failed",
+      });
+    }
+  }
   const validation = validateSql(generatedSql);
   if (!validation.ok) {
     return NextResponse.json({
@@ -60,7 +81,7 @@ export async function POST(request: Request) {
       sql: limitedSql,
       rows,
       rowCount: rows.length,
-      explanation: explainRows(rows),
+      explanation: [modelReasoning, explainRows(rows)].filter(Boolean).join(" "),
       error: null,
     });
   } catch (error) {

@@ -3,8 +3,9 @@ MCP_SERVICE ?= mcp-server
 POSTGRES_SERVICE ?= postgres
 EVAL_SERVICE ?= eval
 FRONTEND_SERVICE ?= frontend
+VLLM_SERVICE ?= vllm
 
-.PHONY: help setup build build-frontend frontend frontend-logs up down ps logs db-shell check-tables sample-queries verify-joins mcp eval eval-generated test-rbac local-eval clean reset-db
+.PHONY: help setup build build-frontend frontend frontend-vllm frontend-logs vllm vllm-logs up down ps logs db-shell check-tables sample-queries verify-joins mcp eval eval-generated test-rbac local-eval clean reset-db
 
 help:
 	@printf "Healthcare Text-to-SQL MCP commands\n\n"
@@ -13,6 +14,8 @@ help:
 	@printf "  make build-frontend  Build Next.js frontend image\n"
 	@printf "  make up              Start PostgreSQL\n"
 	@printf "  make frontend        Start Next.js frontend on FRONTEND_PORT\n"
+	@printf "  make vllm            Start local vLLM OpenAI-compatible server\n"
+	@printf "  make frontend-vllm   Start PostgreSQL, vLLM, and frontend together\n"
 	@printf "  make frontend-logs   Tail frontend logs\n"
 	@printf "  make down            Stop Docker services\n"
 	@printf "  make ps              Show Docker services\n"
@@ -44,6 +47,17 @@ up:
 frontend:
 	$(COMPOSE) up -d $(POSTGRES_SERVICE)
 	$(COMPOSE) --profile frontend up -d $(FRONTEND_SERVICE)
+
+vllm:
+	$(COMPOSE) --profile vllm up -d $(VLLM_SERVICE)
+
+vllm-logs:
+	$(COMPOSE) logs -f $(VLLM_SERVICE)
+
+frontend-vllm:
+	$(COMPOSE) up -d $(POSTGRES_SERVICE)
+	$(COMPOSE) --profile vllm up -d $(VLLM_SERVICE)
+	LLM_BASE_URL=http://vllm:8000/v1 LLM_API_KEY=$${VLLM_API_KEY:-local} LLM_MODEL=$${VLLM_SERVED_MODEL_NAME:-qwen-coder-3b} $(COMPOSE) --profile frontend --profile vllm up -d $(FRONTEND_SERVICE)
 
 frontend-logs:
 	$(COMPOSE) logs -f $(FRONTEND_SERVICE)

@@ -138,10 +138,83 @@ Frontend hiện là demo console cho Text-to-SQL:
 
 - Chọn role `admin`, `staff`, `user`.
 - Xem schema được phép đọc theo role.
-- Chạy câu hỏi tự nhiên với SQL template demo.
+- Chạy câu hỏi tự nhiên bằng LLM thật qua `OPENAI_API_KEY`.
 - Chạy SQL thủ công để test RBAC bảng/cột.
 - Xem SQL, kết quả truy vấn, lỗi phân quyền, thời gian phản hồi và giải thích ngắn.
 - Lưu lịch sử truy vấn gần nhất trong phiên trình duyệt.
+
+Trước khi chạy chế độ hỏi tự nhiên, cấu hình:
+
+```env
+OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=gpt-5-mini
+```
+
+Nếu chưa có API key, tab `SQL` vẫn dùng được để test RBAC và truy vấn read-only.
+
+## Local vLLM Với Qwen 3B
+
+Bạn có thể dùng vLLM thay OpenAI cloud vì vLLM cung cấp OpenAI-compatible API. Với GPU 8GB VRAM, model mặc định cho Text-to-SQL là:
+
+```text
+Qwen/Qwen2.5-Coder-3B-Instruct
+```
+
+Yêu cầu thực tế:
+
+- Nên có NVIDIA GPU.
+- VRAM 8 GB nên dùng 3B với `max-model-len=8192`.
+- Nếu vẫn OOM, đổi xuống `Qwen/Qwen2.5-Coder-1.5B-Instruct`.
+- Nếu có GPU 16 GB trở lên, có thể thử `Qwen/Qwen2.5-Coder-7B-Instruct`.
+- Lần chạy đầu sẽ tải model từ Hugging Face, có thể lâu và tốn dung lượng.
+
+Cấu hình `.env` cho vLLM:
+
+```env
+VLLM_MODEL=Qwen/Qwen2.5-Coder-3B-Instruct
+VLLM_SERVED_MODEL_NAME=qwen-coder-3b
+VLLM_API_KEY=local
+VLLM_MAX_MODEL_LEN=8192
+VLLM_GPU_MEMORY_UTILIZATION=0.85
+
+LLM_BASE_URL=http://vllm:8000/v1
+LLM_API_KEY=local
+LLM_MODEL=qwen-coder-3b
+```
+
+Chạy vLLM và frontend:
+
+```bash
+make frontend-vllm
+make vllm-logs
+```
+
+Khi vLLM ready, mở:
+
+```text
+http://localhost:3000
+```
+
+Nếu muốn chạy vLLM ngoài Docker:
+
+```bash
+vllm serve Qwen/Qwen2.5-Coder-3B-Instruct \
+  --served-model-name qwen-coder-3b \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --api-key local \
+  --generation-config vllm \
+  --max-model-len 8192 \
+  --gpu-memory-utilization 0.85
+```
+
+Sau đó cấu hình frontend:
+
+```env
+LLM_BASE_URL=http://host.docker.internal:8000/v1
+LLM_API_KEY=local
+LLM_MODEL=qwen-coder-3b
+```
 
 ## MCP Tools
 
