@@ -9,7 +9,8 @@ The MCP server lives in `mcp_server/` and exposes database tools over stdio.
 - `check_sql_syntax`: runs PostgreSQL `EXPLAIN` after safety validation.
 - `run_readonly_query`: validates and executes SQL with the readonly PostgreSQL user.
 - `explain_query_result`: generates a short Vietnamese natural language explanation.
-- `ask_database`: handles common demo questions with deterministic SQL templates.
+
+The server intentionally does not expose deterministic Text-to-SQL templates. The LLM should generate SQL from schema metadata, then use MCP tools to validate and execute it.
 
 ## Recommended LLM Flow
 

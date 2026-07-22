@@ -1,39 +1,47 @@
 COMPOSE ?= docker compose
+DOCKER_DESKTOP_COMPOSE ?= '/mnt/c/Program Files/Docker/Docker/resources/bin/docker.exe' compose
 MCP_SERVICE ?= mcp-server
 POSTGRES_SERVICE ?= postgres
 EVAL_SERVICE ?= eval
 FRONTEND_SERVICE ?= frontend
 VLLM_SERVICE ?= vllm
 
-.PHONY: help setup build build-frontend frontend frontend-vllm frontend-logs vllm vllm-logs up down ps logs db-shell check-tables sample-queries verify-joins mcp eval eval-generated test-rbac local-eval clean reset-db
+.PHONY: help setup env-check build build-frontend dev frontend recreate-frontend frontend-vllm frontend-logs vllm vllm-logs health docker-desktop-up docker-desktop-health up down ps logs db-shell check-tables sample-queries verify-joins mcp eval eval-generated test-rbac local-eval clean reset-db
 
 help:
 	@printf "Healthcare Text-to-SQL MCP commands\n\n"
-	@printf "  make setup           Copy .env.example to .env if missing\n"
-	@printf "  make build           Build MCP Docker image\n"
-	@printf "  make build-frontend  Build Next.js frontend image\n"
-	@printf "  make up              Start PostgreSQL\n"
-	@printf "  make frontend        Start Next.js frontend on FRONTEND_PORT\n"
-	@printf "  make vllm            Start local vLLM OpenAI-compatible server\n"
-	@printf "  make frontend-vllm   Start PostgreSQL, vLLM, and frontend together\n"
-	@printf "  make frontend-logs   Tail frontend logs\n"
-	@printf "  make down            Stop Docker services\n"
-	@printf "  make ps              Show Docker services\n"
-	@printf "  make logs            Tail PostgreSQL logs\n"
-	@printf "  make db-shell        Open psql shell as admin user\n"
-	@printf "  make check-tables    Check imported table row counts\n"
-	@printf "  make sample-queries  Run sample SQL queries\n"
-	@printf "  make verify-joins    Verify important joins\n"
-	@printf "  make mcp             Run MCP server over stdio via Docker Compose\n"
-	@printf "  make eval            Run Text-to-SQL evaluation in Docker\n"
-	@printf "  make eval-generated  Run Docker eval with outputs/generated_sql.jsonl\n"
-	@printf "  make test-rbac       Smoke test table/column permission rules\n"
-	@printf "  make local-eval      Run Text-to-SQL evaluation locally\n"
-	@printf "  make clean           Remove stopped containers for this compose project\n"
-	@printf "  make reset-db        Stop services and delete PostgreSQL volume\n"
+	@printf "Main:\n"
+	@printf "  make setup              Create .env if missing\n"
+	@printf "  make dev                Start PostgreSQL, vLLM, and frontend\n"
+	@printf "  make recreate-frontend  Recreate frontend after .env/code changes\n"
+	@printf "  make health             Smoke test schema and DB query path\n"
+	@printf "  make down               Stop services\n\n"
+	@printf "Docker Desktop / WSL:\n"
+	@printf "  make docker-desktop-up      Start dev stack via docker.exe\n"
+	@printf "  make docker-desktop-health  Run health check via docker.exe\n\n"
+	@printf "Logs:\n"
+	@printf "  make ps                 Show services\n"
+	@printf "  make frontend-logs      Tail frontend logs\n"
+	@printf "  make vllm-logs          Tail vLLM logs\n"
+	@printf "  make logs               Tail PostgreSQL logs\n\n"
+	@printf "Build/Test:\n"
+	@printf "  make build              Build MCP/eval image\n"
+	@printf "  make build-frontend     Build frontend image\n"
+	@printf "  make check-tables       Check imported table row counts\n"
+	@printf "  make eval               Run Text-to-SQL evaluation\n"
+	@printf "  make test-rbac          Smoke test table/column permission rules\n"
 
 setup:
 	@test -f .env || cp .env.example .env
+	@$(MAKE) env-check
+
+env-check:
+	@test -f .env
+	@grep -q '^LLM_BASE_URL=' .env
+	@grep -q '^LLM_API_KEY=' .env
+	@grep -q '^LLM_MODEL=' .env
+	@grep -q '^VLLM_MODEL=' .env
+	@printf ".env looks ready for local vLLM\n"
 
 build:
 	$(COMPOSE) build $(MCP_SERVICE) $(EVAL_SERVICE)
@@ -44,9 +52,14 @@ build-frontend:
 up:
 	$(COMPOSE) up -d $(POSTGRES_SERVICE)
 
+dev: frontend-vllm
+
 frontend:
 	$(COMPOSE) up -d $(POSTGRES_SERVICE)
 	$(COMPOSE) --profile frontend up -d $(FRONTEND_SERVICE)
+
+recreate-frontend:
+	$(COMPOSE) --profile frontend --profile vllm up -d --force-recreate $(FRONTEND_SERVICE)
 
 vllm:
 	$(COMPOSE) --profile vllm up -d $(VLLM_SERVICE)
@@ -57,10 +70,21 @@ vllm-logs:
 frontend-vllm:
 	$(COMPOSE) up -d $(POSTGRES_SERVICE)
 	$(COMPOSE) --profile vllm up -d $(VLLM_SERVICE)
-	LLM_BASE_URL=http://vllm:8000/v1 LLM_API_KEY=$${VLLM_API_KEY:-local} LLM_MODEL=$${VLLM_SERVED_MODEL_NAME:-qwen-coder-3b} $(COMPOSE) --profile frontend --profile vllm up -d $(FRONTEND_SERVICE)
+	$(COMPOSE) --profile frontend --profile vllm up -d $(FRONTEND_SERVICE)
 
 frontend-logs:
 	$(COMPOSE) logs -f $(FRONTEND_SERVICE)
+
+health:
+	$(COMPOSE) ps
+	$(COMPOSE) exec $(FRONTEND_SERVICE) node -e "fetch('http://127.0.0.1:3000/api/schema?userId=admin').then(r=>r.json()).then(j=>{if(!j.prompt_rules||!j.tables){process.exit(1)}; console.log('schema ok:', Object.keys(j.tables).length, 'tables')})"
+	$(COMPOSE) exec $(FRONTEND_SERVICE) node -e "fetch('http://127.0.0.1:3000/api/query',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:'sql',userId:'admin',sql:'SELECT gender, COUNT(*) AS total FROM patients GROUP BY gender ORDER BY total DESC'})}).then(r=>r.json()).then(j=>{if(!j.ok){console.error(j.error);process.exit(1)}; console.log('query ok:', JSON.stringify(j.rows))})"
+
+docker-desktop-up:
+	$(MAKE) COMPOSE="$(DOCKER_DESKTOP_COMPOSE)" frontend-vllm
+
+docker-desktop-health:
+	$(MAKE) COMPOSE="$(DOCKER_DESKTOP_COMPOSE)" health
 
 down:
 	$(COMPOSE) down

@@ -104,7 +104,7 @@
   "prompt_rules": [
     "Use only visible tables and columns from the schema.",
     "Prefer aggregate queries and add LIMIT for ranked/list outputs unless the user explicitly asks for no limit/khong can limit.",
-    "Use COUNT(DISTINCT patient) when asking how many patients had a condition/event.",
+    "Use COUNT(DISTINCT patient) only for event tables that have a patient column, such as encounters, conditions, medications, observations, and procedures. For the patients table itself, use patients.id or COUNT(*).",
     "For patients.gender, use Synthea codes: male/nam = 'M', female/nu = 'F'. Never use 'male' or 'female'.",
     "For medication/drug/thuoc type questions, use medications.description as the medication name/type. The medications table has no id column.",
     "If the question asks medications that appear most often/xuat hien nhieu nhat, do not join patients or encounters. Use exactly this pattern: SELECT description, COUNT(*) AS total FROM medications GROUP BY description ORDER BY total DESC.",
