@@ -1,4 +1,6 @@
+import json
 import re
+from pathlib import Path
 
 import sqlglot
 from sqlglot import exp
@@ -19,18 +21,12 @@ BLOCKED_KEYWORDS = {
     "execute",
 }
 
-KNOWN_TABLES = {
-    "patients",
-    "encounters",
-    "conditions",
-    "medications",
-    "observations",
-    "procedures",
-    "claims",
-    "providers",
-    "organizations",
-    "payers",
-}
+SCHEMA_METADATA_FILE = Path(__file__).resolve().parent / "schema_metadata.json"
+
+
+def known_tables() -> set[str]:
+    metadata = json.loads(SCHEMA_METADATA_FILE.read_text(encoding="utf-8"))
+    return set(metadata["tables"].keys())
 
 
 def strip_code_fence(sql: str) -> str:
@@ -131,7 +127,7 @@ def validate_sql(sql: str) -> tuple[bool, str, str | None]:
     if expression is None:
         return False, cleaned, "parse_error"
 
-    unknown_tables = sorted(referenced_tables(cleaned) - KNOWN_TABLES)
+    unknown_tables = sorted(referenced_tables(cleaned) - known_tables())
     if unknown_tables:
         return False, cleaned, "unknown_table:" + ",".join(unknown_tables)
 

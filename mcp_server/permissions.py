@@ -99,13 +99,13 @@ def denied_columns_in_sql(role: str, sql: str) -> list[str]:
 def filter_schema_for_user(user_id: str | None, schema: dict[str, Any]) -> dict[str, Any]:
     user = get_user(user_id)
     if user is None:
-        return {"tables": {}, "join_hints": [], "user": None, "error": "unknown_user"}
+        return {"tables": {}, "join_hints": [], "prompt_rules": [], "user": None, "error": "unknown_user"}
 
     policy = role_policy(user["role"])
     allowed_tables = allowed_tables_for_user(user["id"])
     denied_columns = policy.get("denied_columns", {})
 
-    tables: dict[str, list[dict[str, str]]] = {}
+    tables: dict[str, list[dict[str, Any]]] = {}
     for table_name, columns in schema["tables"].items():
         if allowed_tables is not None and table_name not in allowed_tables:
             continue
@@ -128,6 +128,7 @@ def filter_schema_for_user(user_id: str | None, schema: dict[str, Any]) -> dict[
         "user": user,
         "tables": tables,
         "join_hints": join_hints,
+        "prompt_rules": schema.get("prompt_rules", []),
     }
 
 

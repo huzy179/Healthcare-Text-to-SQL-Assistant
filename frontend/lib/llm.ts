@@ -24,25 +24,20 @@ export async function generateSqlWithLlm(question: string, userId: string): Prom
     "You generate safe PostgreSQL SELECT queries for a healthcare analytics database. Return only JSON with keys sql and reasoning. The sql must be a single SELECT statement. Never generate INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, COPY, GRANT, REVOKE, CALL, or EXECUTE.";
   const userPrompt = [
     "Use this role-filtered schema and join hints.",
-    JSON.stringify(schema, null, 2),
+    JSON.stringify(schema),
     "",
     "Question:",
     question,
     "",
     "Rules:",
-    "- Use only visible tables and columns from the schema.",
-    "- Prefer aggregate queries and add LIMIT for ranked/list outputs.",
-    "- Use COUNT(DISTINCT patient) when asking how many patients had a condition/event.",
-    "- For patients.gender, use Synthea codes: male/nam = 'M', female/nu = 'F'. Never use 'male' or 'female'.",
-    "- observations.value is text; cast only after checking it is numeric.",
-    "- Return compact JSON only, for example {\"sql\":\"SELECT ...\",\"reasoning\":\"...\"}.",
+    ...schema.prompt_rules.map((rule) => `- ${rule}`),
   ].join("\n");
 
   if (baseURL) {
     const completion = await client.chat.completions.create({
       model,
       temperature: 0,
-      max_tokens: Number(process.env.LLM_MAX_TOKENS ?? "256"),
+      max_tokens: Number(process.env.LLM_MAX_TOKENS ?? "192"),
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

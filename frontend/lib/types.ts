@@ -24,5 +24,6 @@ export type VisibleSchema = {
   user: DemoUser | null;
   tables: Record<string, { name: string; type: string; notes?: string }[]>;
   join_hints: string[];
+  prompt_rules: string[];
   error?: string;
 };

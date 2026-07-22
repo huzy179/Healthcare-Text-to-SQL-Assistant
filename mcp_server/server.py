@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -13,32 +15,36 @@ database = Database(settings.database_url, settings.query_timeout_ms)
 mcp = FastMCP("healthcare-postgres")
 
 
-JOIN_HINTS = [
-    "encounters.patient -> patients.id",
-    "conditions.patient -> patients.id",
-    "conditions.encounter -> encounters.id",
-    "medications.patient -> patients.id",
-    "medications.encounter -> encounters.id",
-    "observations.patient -> patients.id",
-    "procedures.patient -> patients.id",
-    "procedures.encounter -> encounters.id",
-    "encounters.provider -> providers.id",
-    "providers.organization -> organizations.id",
-    "encounters.organization -> organizations.id",
-    "encounters.payer -> payers.id",
-]
+ROOT_DIR = Path(__file__).resolve().parent
+SCHEMA_METADATA_FILE = ROOT_DIR / "schema_metadata.json"
+
+
+def load_schema_metadata() -> dict[str, Any]:
+    return json.loads(SCHEMA_METADATA_FILE.read_text(encoding="utf-8"))
 
 
 def compact_schema(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    tables: dict[str, list[dict[str, str]]] = {}
+    metadata = load_schema_metadata()
+    metadata_columns = {
+        (table_name, column["name"]): column
+        for table_name, columns in metadata["tables"].items()
+        for column in columns
+    }
+
+    tables: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
-        tables.setdefault(row["table_name"], []).append(
-            {
-                "name": row["column_name"],
-                "type": row["data_type"],
-            }
-        )
-    return {"tables": tables, "join_hints": JOIN_HINTS}
+        column = {
+            "name": row["column_name"],
+            "type": row["data_type"],
+        }
+        column.update(metadata_columns.get((row["table_name"], row["column_name"]), {}))
+        tables.setdefault(row["table_name"], []).append(column)
+
+    return {
+        "tables": tables,
+        "join_hints": metadata["join_hints"],
+        "prompt_rules": metadata["prompt_rules"],
+    }
 
 
 @mcp.tool()
@@ -137,15 +143,6 @@ def run_readonly_query(sql: str, user_id: str | None = None) -> dict[str, Any]:
 
 
 @mcp.tool()
-def ask_database(question: str, user_id: str | None = None) -> dict[str, Any]:
-    """Answer common healthcare analytics questions with safe SQL templates."""
-    sql = fallback_sql(question)
-    result = run_readonly_query(sql, user_id)
-    result["question"] = question
-    return result
-
-
-@mcp.tool()
 def explain_query_result(question: str, sql: str, rows: list[dict[str, Any]]) -> dict[str, str]:
     """Generate a short Vietnamese explanation for query results."""
     return {
@@ -169,25 +166,6 @@ def explain_rows(rows: list[dict[str, Any]]) -> str:
         + ", ".join(columns)
         + ". Các dòng đầu thể hiện những nhóm hoặc bản ghi có giá trị nổi bật theo điều kiện truy vấn."
     )
-
-
-def fallback_sql(question: str) -> str:
-    normalized = question.lower()
-    if "giới tính" in normalized or "gender" in normalized:
-        return "SELECT gender, COUNT(*) AS total FROM patients GROUP BY gender ORDER BY total DESC"
-    if "diabetes" in normalized:
-        return "SELECT COUNT(DISTINCT patient) AS total_patients FROM conditions WHERE description ILIKE '%diabetes%'"
-    if "hypertension" in normalized or "tăng huyết áp" in normalized:
-        return "SELECT COUNT(DISTINCT patient) AS total_patients FROM conditions WHERE description ILIKE '%hypertension%'"
-    if "bệnh" in normalized or "chẩn đoán" in normalized or "condition" in normalized:
-        return "SELECT description, COUNT(*) AS total FROM conditions GROUP BY description ORDER BY total DESC LIMIT 10"
-    if "lượt khám" in normalized or "encounter" in normalized:
-        return "SELECT encounterclass, COUNT(*) AS total_encounters FROM encounters GROUP BY encounterclass ORDER BY total_encounters DESC"
-    if "thuốc" in normalized or "medication" in normalized:
-        return "SELECT description, COUNT(*) AS total FROM medications GROUP BY description ORDER BY total DESC LIMIT 10"
-    if "procedure" in normalized or "thủ thuật" in normalized:
-        return "SELECT description, COUNT(*) AS total FROM procedures GROUP BY description ORDER BY total DESC LIMIT 10"
-    return "SELECT COUNT(*) AS total_patients FROM patients"
 
 
 if __name__ == "__main__":
