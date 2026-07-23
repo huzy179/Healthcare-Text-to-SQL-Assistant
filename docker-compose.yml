@@ -46,6 +46,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_READONLY_USER:-healthcare_readonly}:${POSTGRES_READONLY_PASSWORD:-readonly_password}@postgres:5432/${POSTGRES_DB:-healthcare}
       MCP_QUERY_TIMEOUT_MS: ${MCP_QUERY_TIMEOUT_MS:-30000}
       MCP_MAX_ROWS: ${MCP_MAX_ROWS:-200}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://vllm:8000/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-local}
+      LLM_MODEL: ${LLM_MODEL:-qwen-coder-3b}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-192}
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     depends_on:
       postgres:

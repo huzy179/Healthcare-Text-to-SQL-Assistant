@@ -73,7 +73,8 @@ make vllm-logs          # follow vLLM logs
 make frontend-logs      # follow frontend logs
 make check-tables       # verify imported table row counts
 make sample-queries     # run sample SQL
-make eval               # run evaluation
+make eval-gold          # validate reference SQL + DB + validator
+make eval-llm           # generate SQL with vLLM, then evaluate it
 make down               # stop services
 ```
 

@@ -103,12 +103,47 @@
   ],
   "prompt_rules": [
     "Use only visible tables and columns from the schema.",
-    "Prefer aggregate queries and add LIMIT for ranked/list outputs unless the user explicitly asks for no limit/khong can limit.",
-    "Use COUNT(DISTINCT patient) only for event tables that have a patient column, such as encounters, conditions, medications, observations, and procedures. For the patients table itself, use patients.id or COUNT(*).",
+    "Prefer aggregate queries and add LIMIT only for ranked/top/list outputs. Do not add LIMIT for questions asking totals by each year/tung nam, by each status/tung trang thai, or by each category/tung loai unless the question says top.",
+    "Use COUNT(*) for rows/events. Use COUNT(DISTINCT patient) only when asking how many unique patients had a condition/event. For the patients table itself, use patients.id or COUNT(*).",
+    "For questions by gender/theo gioi tinh, group by patients.gender. Do not filter M/F unless asking only male/nam or female/nu.",
     "For patients.gender, use Synthea codes: male/nam = 'M', female/nu = 'F'. Never use 'male' or 'female'.",
+    "For disease/condition filters such as Diabetes or Hypertension, filter conditions.description with ILIKE. Do not invent condition code values.",
     "For medication/drug/thuoc type questions, use medications.description as the medication name/type. The medications table has no id column.",
+    "For procedure/thu thuat questions, use the procedures table, not medications.",
+    "For claim cost by encounter class, use encounters.total_claim_cost and encounters.encounterclass, not the claims table.",
+    "For organization/facility/co so y te names, use organizations.name.",
     "If the question asks medications that appear most often/xuat hien nhieu nhat, do not join patients or encounters. Use exactly this pattern: SELECT description, COUNT(*) AS total FROM medications GROUP BY description ORDER BY total DESC.",
-    "observations.value is text; cast only after checking it is numeric.",
+    "observations.value is text; cast only after filtering numeric rows with value ~ '^-?[0-9]+(\\\\.[0-9]+)?$'. Never use CAST(value AS numeric) IS NOT NULL.",
     "Return compact JSON only, for example {\"sql\":\"SELECT ...\",\"reasoning\":\"...\"}."
+  ],
+  "prompt_examples": [
+    {
+      "question": "Có bao nhiêu bệnh nhân theo giới tính?",
+      "sql": "SELECT gender, COUNT(*) AS total FROM patients GROUP BY gender ORDER BY total DESC;"
+    },
+    {
+      "question": "Có bao nhiêu bệnh nhân nam?",
+      "sql": "SELECT COUNT(*) AS total_male_patients FROM patients WHERE gender = 'M';"
+    },
+    {
+      "question": "Số lượt khám theo từng năm là bao nhiêu?",
+      "sql": "SELECT EXTRACT(YEAR FROM start) AS year, COUNT(*) AS total_encounters FROM encounters GROUP BY year ORDER BY year;"
+    },
+    {
+      "question": "Có bao nhiêu bệnh nhân từng có chẩn đoán liên quan đến Diabetes?",
+      "sql": "SELECT COUNT(DISTINCT patient) AS total_patients FROM conditions WHERE description ILIKE '%diabetes%';"
+    },
+    {
+      "question": "Top 10 thủ thuật phổ biến nhất là gì?",
+      "sql": "SELECT description, COUNT(*) AS total FROM procedures GROUP BY description ORDER BY total DESC LIMIT 10;"
+    },
+    {
+      "question": "Giá trị trung bình của các observation dạng số phổ biến nhất là bao nhiêu?",
+      "sql": "SELECT description, AVG(value::NUMERIC) AS avg_value, units FROM observations WHERE value ~ '^-?[0-9]+(\\\\.[0-9]+)?$' GROUP BY description, units ORDER BY COUNT(*) DESC LIMIT 10;"
+    },
+    {
+      "question": "Chi phí claim trung bình theo từng loại encounter là bao nhiêu?",
+      "sql": "SELECT encounterclass, AVG(total_claim_cost) AS avg_claim_cost FROM encounters GROUP BY encounterclass ORDER BY avg_claim_cost DESC;"
+    }
   ]
 }

@@ -7,6 +7,21 @@ type SqlGeneration = {
   reasoning: string;
 };
 
+function compactSchemaForPrompt(schema: ReturnType<typeof visibleSchema>) {
+  return {
+    tables: Object.fromEntries(
+      Object.entries(schema.tables).map(([table, columns]) => [
+        table,
+        columns.map((column) => {
+          const note = column.notes ? ` (${column.notes})` : "";
+          return `${column.name}:${column.type}${note}`;
+        }),
+      ]),
+    ),
+    join_hints: schema.join_hints,
+  };
+}
+
 export async function generateSqlWithLlm(question: string, userId: string): Promise<SqlGeneration> {
   const baseURL = process.env.LLM_BASE_URL || process.env.OPENAI_BASE_URL;
   const apiKey = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || (baseURL ? "local" : "");
@@ -24,13 +39,18 @@ export async function generateSqlWithLlm(question: string, userId: string): Prom
     "You generate safe PostgreSQL SELECT queries for a healthcare analytics database. Return only JSON with keys sql and reasoning. The sql must be a single SELECT statement. Never generate INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, COPY, GRANT, REVOKE, CALL, or EXECUTE.";
   const userPrompt = [
     "Use this role-filtered schema and join hints.",
-    JSON.stringify(schema),
+    JSON.stringify(compactSchemaForPrompt(schema)),
     "",
     "Question:",
     question,
     "",
     "Rules:",
     ...schema.prompt_rules.map((rule) => `- ${rule}`),
+    "",
+    "Examples:",
+    ...(schema.prompt_examples || []).map(
+      (example) => `Q: ${example.question}\nSQL: ${example.sql}`,
+    ),
   ].join("\n");
 
   if (baseURL) {

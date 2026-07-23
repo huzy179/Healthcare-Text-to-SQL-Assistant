@@ -159,6 +159,30 @@ Metrics chính:
 
 Execution Accuracy quan trọng hơn Exact Match vì nhiều SQL khác nhau vẫn có thể trả cùng kết quả đúng.
 
+Có hai chế độ eval:
+
+```bash
+make eval-gold
+```
+
+Chế độ này chỉ kiểm tra `expected_sql`, database, validator và RBAC. Nó không đo chất lượng LLM.
+
+```bash
+make eval-llm
+```
+
+Chế độ này gọi vLLM sinh SQL cho bộ câu hỏi, ghi vào `outputs/generated_sql.jsonl`, rồi so sánh với `expected_sql`.
+
+Kết quả chính:
+
+```text
+reports/text_to_sql_gold_summary.md
+reports/text_to_sql_llm_summary.md
+reports/text_to_sql_llm_results.jsonl
+```
+
+Report LLM có phân loại lỗi như `wrong_column`, `wrong_table`, `syntax_error`, `permission_error`, `wrong_join`, `wrong_filter`, `wrong_aggregation`.
+
 ## Docs Phụ
 
 Docs cũ đã được chuyển vào:

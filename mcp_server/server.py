@@ -44,6 +44,7 @@ def compact_schema(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "tables": tables,
         "join_hints": metadata["join_hints"],
         "prompt_rules": metadata["prompt_rules"],
+        "prompt_examples": metadata.get("prompt_examples", []),
     }
 
 

@@ -8,6 +8,7 @@ type SchemaMetadata = {
   tables: VisibleSchema["tables"];
   join_hints: string[];
   prompt_rules: string[];
+  prompt_examples?: { question: string; sql: string }[];
 };
 
 const metadataPathCandidates = [
@@ -28,7 +29,7 @@ export function visibleSchema(userId?: string): VisibleSchema {
   const policy = loadPolicy();
   const user = getUser(userId);
   if (!user) {
-    return { user: null, tables: {}, join_hints: [], prompt_rules: [], error: "unknown_user" };
+    return { user: null, tables: {}, join_hints: [], prompt_rules: [], prompt_examples: [], error: "unknown_user" };
   }
 
   const role = policy.roles[user.role];
@@ -50,6 +51,7 @@ export function visibleSchema(userId?: string): VisibleSchema {
     user,
     tables,
     prompt_rules: metadata.prompt_rules,
+    prompt_examples: metadata.prompt_examples || [],
     join_hints: metadata.join_hints.filter((hint) => {
       if (!allowed) return true;
       return hint

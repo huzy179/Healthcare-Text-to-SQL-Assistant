@@ -25,5 +25,6 @@ export type VisibleSchema = {
   tables: Record<string, { name: string; type: string; notes?: string }[]>;
   join_hints: string[];
   prompt_rules: string[];
+  prompt_examples?: { question: string; sql: string }[];
   error?: string;
 };

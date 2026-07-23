@@ -6,7 +6,7 @@ EVAL_SERVICE ?= eval
 FRONTEND_SERVICE ?= frontend
 VLLM_SERVICE ?= vllm
 
-.PHONY: help setup env-check build build-frontend dev frontend recreate-frontend frontend-vllm frontend-logs vllm vllm-logs health docker-desktop-up docker-desktop-health up down ps logs db-shell check-tables sample-queries verify-joins mcp eval eval-generated test-rbac local-eval clean reset-db
+.PHONY: help setup env-check build build-frontend dev frontend recreate-frontend frontend-vllm frontend-logs vllm vllm-logs health docker-desktop-up docker-desktop-health up down ps logs db-shell check-tables sample-queries verify-joins mcp eval eval-gold generate-sql eval-generated eval-llm docker-desktop-eval-llm test-rbac local-eval clean reset-db
 
 help:
 	@printf "Healthcare Text-to-SQL MCP commands\n\n"
@@ -28,7 +28,8 @@ help:
 	@printf "  make build              Build MCP/eval image\n"
 	@printf "  make build-frontend     Build frontend image\n"
 	@printf "  make check-tables       Check imported table row counts\n"
-	@printf "  make eval               Run Text-to-SQL evaluation\n"
+	@printf "  make eval-gold          Validate reference SQL, DB, and validator\n"
+	@printf "  make eval-llm           Generate SQL with vLLM, then evaluate it\n"
 	@printf "  make test-rbac          Smoke test table/column permission rules\n"
 
 setup:
@@ -110,17 +111,28 @@ verify-joins:
 mcp:
 	$(COMPOSE) run --rm -T $(MCP_SERVICE)
 
-eval:
-	$(COMPOSE) run --rm $(EVAL_SERVICE) python scripts/evaluate_text_to_sql.py --user-id admin
+eval: eval-gold
+
+eval-gold:
+	$(COMPOSE) run --rm $(EVAL_SERVICE) python scripts/evaluate_text_to_sql.py --mode gold --user-id admin --output-file reports/text_to_sql_gold_results.jsonl --summary-file reports/text_to_sql_gold_summary.md
+
+generate-sql:
+	$(COMPOSE) --profile vllm up -d $(VLLM_SERVICE)
+	$(COMPOSE) run --rm $(EVAL_SERVICE) python scripts/generate_text_to_sql.py --user-id admin --output-file outputs/generated_sql.jsonl
 
 eval-generated:
-	$(COMPOSE) run --rm $(EVAL_SERVICE) python scripts/evaluate_text_to_sql.py --user-id admin --generated-file outputs/generated_sql.jsonl
+	$(COMPOSE) run --rm $(EVAL_SERVICE) python scripts/evaluate_text_to_sql.py --mode generated --user-id admin --generated-file outputs/generated_sql.jsonl --output-file reports/text_to_sql_llm_results.jsonl --summary-file reports/text_to_sql_llm_summary.md
+
+eval-llm: generate-sql eval-generated
+
+docker-desktop-eval-llm:
+	$(MAKE) COMPOSE="$(DOCKER_DESKTOP_COMPOSE)" eval-llm
 
 test-rbac:
 	$(COMPOSE) run --rm $(EVAL_SERVICE) python -c "import sys; sys.path.append('/app/mcp_server'); from permissions import can_read_sql; tests=[('staff','SELECT ssn FROM patients'),('staff','SELECT * FROM patients'),('admin','SELECT * FROM patients'),('user','SELECT * FROM patients'),('user','SELECT COUNT(*) FROM encounters')]; [print(t, can_read_sql(*t)) for t in tests]"
 
 local-eval:
-	python3 scripts/evaluate_text_to_sql.py --user-id admin
+	python3 scripts/evaluate_text_to_sql.py --mode gold --user-id admin
 
 clean:
 	$(COMPOSE) rm -f
