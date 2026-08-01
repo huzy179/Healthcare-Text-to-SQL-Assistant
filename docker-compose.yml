@@ -30,6 +30,9 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_READONLY_USER:-healthcare_readonly}:${POSTGRES_READONLY_PASSWORD:-readonly_password}@postgres:5432/${POSTGRES_DB:-healthcare}
       MCP_QUERY_TIMEOUT_MS: ${MCP_QUERY_TIMEOUT_MS:-30000}
       MCP_MAX_ROWS: ${MCP_MAX_ROWS:-200}
+      AUDIT_LOG_PATH: ${AUDIT_LOG_PATH:-/app/reports/audit_log.jsonl}
+    volumes:
+      - ./reports:/app/reports
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,11 +80,14 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_READONLY_USER:-healthcare_readonly}:${POSTGRES_READONLY_PASSWORD:-readonly_password}@postgres:5432/${POSTGRES_DB:-healthcare}
       MCP_QUERY_TIMEOUT_MS: ${MCP_QUERY_TIMEOUT_MS:-30000}
       MCP_MAX_ROWS: ${MCP_MAX_ROWS:-200}
+      AUDIT_LOG_PATH: ${AUDIT_LOG_PATH:-/app/reports/audit_log.jsonl}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./reports:/app/reports
 
   vllm:
     image: vllm/vllm-openai:latest

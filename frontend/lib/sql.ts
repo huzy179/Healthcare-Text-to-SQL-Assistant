@@ -17,7 +17,26 @@ const blockedKeywords = [
   "revoke",
   "call",
   "execute",
+  "merge",
+  "vacuum",
+  "analyze",
+  "listen",
+  "notify",
 ];
+
+const dangerousFunctions = [
+  "dblink",
+  "dblink_connect",
+  "lo_export",
+  "lo_import",
+  "pg_sleep",
+  "pg_read_binary_file",
+  "pg_read_file",
+  "pg_stat_file",
+  "pg_terminate_backend",
+];
+
+const heavyTables = new Set(["observations", "procedures", "claims", "encounters", "medications"]);
 
 export function validateSql(sql: string): { ok: boolean; sql: string; error: string | null } {
   const cleaned = sql.trim().replace(/;+\s*$/g, "");
@@ -32,16 +51,28 @@ export function validateSql(sql: string): { ok: boolean; sql: string; error: str
   if (cleaned.includes(";")) {
     return { ok: false, sql: cleaned, error: "multiple_statements" };
   }
+  if (/--|\/\*/.test(cleaned)) {
+    return { ok: false, sql: cleaned, error: "comment_not_allowed" };
+  }
 
   for (const keyword of blockedKeywords) {
     if (new RegExp(`\\b${keyword}\\b`, "i").test(cleaned)) {
       return { ok: false, sql: cleaned, error: `blocked_keyword:${keyword}` };
     }
   }
+  for (const fn of dangerousFunctions) {
+    if (new RegExp(`\\b${fn}\\s*\\(`, "i").test(cleaned)) {
+      return { ok: false, sql: cleaned, error: `dangerous_function:${fn}` };
+    }
+  }
 
-  const unknown = referencedTables(cleaned).filter((table) => !knownTables().has(table));
+  const tables = referencedTables(cleaned);
+  const unknown = tables.filter((table) => !knownTables().has(table));
   if (unknown.length > 0) {
     return { ok: false, sql: cleaned, error: `unknown_table:${unknown.join(",")}` };
+  }
+  if (isPotentiallyHeavy(cleaned, tables)) {
+    return { ok: false, sql: cleaned, error: "query_too_heavy:add_limit_or_aggregate" };
   }
 
   return { ok: true, sql: cleaned, error: null };
@@ -61,4 +92,17 @@ export function referencedTables(sql: string): string[] {
     tables.add(match[1].toLowerCase());
   }
   return [...tables];
+}
+
+function isPotentiallyHeavy(sql: string, tables: string[]): boolean {
+  if (!tables.some((table) => heavyTables.has(table))) {
+    return false;
+  }
+  if (/\blimit\s+\d+\b/i.test(sql)) {
+    return false;
+  }
+  if (/\b(count|sum|avg|min|max)\s*\(/i.test(sql)) {
+    return false;
+  }
+  return true;
 }

@@ -75,6 +75,8 @@ make check-tables       # verify imported table row counts
 make sample-queries     # run sample SQL
 make eval-gold          # validate reference SQL + DB + validator
 make eval-llm           # generate SQL with vLLM, then evaluate it
+make eval-safety        # prove unsafe query rejection
+make benchmark          # run gold + llm + safety benchmark summary
 make down               # stop services
 ```
 
@@ -90,6 +92,31 @@ MCP server dùng `stdio`, không expose HTTP port. Tool hiện có:
 - `explain_query_result`
 
 Schema-aware rules nằm ở [mcp_server/schema_metadata.json](mcp_server/schema_metadata.json). Frontend và MCP cùng đọc file này để tránh sửa case-by-case ở FE.
+
+## Benchmark
+
+Benchmark reports:
+
+```text
+reports/benchmark_summary.md
+reports/text_to_sql_llm_summary.md
+reports/sql_safety_summary.md
+reports/audit_log.jsonl
+```
+
+Benchmark table gồm:
+
+- Exact Match
+- Execution Accuracy
+- Valid SQL Rate
+- Unsafe Query Rejection Rate
+- Latency
+
+Các mode được tách rõ trong report:
+
+- LLM single-shot SQL generation
+- Backend pipeline without MCP
+- Agent with MCP multi-step
 
 ## Docs
 

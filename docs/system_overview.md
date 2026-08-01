@@ -160,6 +160,7 @@ Metrics chính:
 Execution Accuracy quan trọng hơn Exact Match vì nhiều SQL khác nhau vẫn có thể trả cùng kết quả đúng.
 
 Có hai chế độ eval:
+Có bốn phần benchmark/eval chính:
 
 ```bash
 make eval-gold
@@ -173,15 +174,56 @@ make eval-llm
 
 Chế độ này gọi vLLM sinh SQL cho bộ câu hỏi, ghi vào `outputs/generated_sql.jsonl`, rồi so sánh với `expected_sql`.
 
+```bash
+make eval-safety
+```
+
+Chế độ này chứng minh validator chặn query nguy hiểm:
+
+- `DELETE`, `UPDATE`, `DROP` và keyword ghi/sửa/xóa.
+- Multi-statement.
+- Comment bypass bằng `--` hoặc `/* ... */`.
+- CTE chứa câu lệnh ghi.
+- Function nguy hiểm như `pg_sleep`, `pg_read_file`, `dblink`, `lo_import`.
+- Query quá nặng như đọc bảng lớn không `LIMIT` và không aggregate.
+
+```bash
+make benchmark
+```
+
+Chạy gold eval, LLM eval, safety eval và ghi bảng tổng hợp.
+
 Kết quả chính:
 
 ```text
+reports/benchmark_summary.md
 reports/text_to_sql_gold_summary.md
 reports/text_to_sql_llm_summary.md
 reports/text_to_sql_llm_results.jsonl
+reports/sql_safety_summary.md
 ```
 
 Report LLM có phân loại lỗi như `wrong_column`, `wrong_table`, `syntax_error`, `permission_error`, `wrong_join`, `wrong_filter`, `wrong_aggregation`.
+
+Bảng benchmark tổng hợp có các cột:
+
+- Exact Match.
+- Execution Accuracy.
+- Valid SQL Rate.
+- Unsafe Query Rejection Rate.
+- Latency.
+
+Các mode được tách rõ:
+
+- LLM single-shot SQL generation.
+- Backend pipeline without MCP.
+- Agent with MCP multi-step, hiện là mục pending để nối MCP client/agent thật.
+
+Runtime cũng có row limit, statement timeout và audit log:
+
+- Row limit: `MCP_MAX_ROWS`.
+- Statement timeout: `MCP_QUERY_TIMEOUT_MS`.
+- Audit log: `reports/audit_log.jsonl`.
 
 ## Docs Phụ
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { writeAudit } from "@/lib/audit";
 import { runQuery } from "@/lib/db";
 import { explainRows } from "@/lib/explain";
 import { generateSqlWithLlm } from "@/lib/llm";
@@ -7,6 +8,7 @@ import { addDefaultLimit, validateSql } from "@/lib/sql";
 import { canReadSql } from "@/lib/users";
 
 export async function POST(request: Request) {
+  const started = performance.now();
   const body = (await request.json()) as { mode?: "question" | "sql"; question?: string; sql?: string; userId?: string };
   const mode = body.mode || "question";
   const question = body.question?.trim() || "";
@@ -27,6 +29,16 @@ export async function POST(request: Request) {
       generatedSql = generated.sql;
       modelReasoning = generated.reasoning;
     } catch (error) {
+      writeAudit({
+        event: "query",
+        userId,
+        mode,
+        question,
+        sql: "",
+        ok: false,
+        error: error instanceof Error ? error.message : "llm_generation_failed",
+        latencyMs: Math.round(performance.now() - started),
+      });
       return NextResponse.json({
         ok: false,
         question,
@@ -42,6 +54,16 @@ export async function POST(request: Request) {
   }
   const validation = validateSql(generatedSql);
   if (!validation.ok) {
+    writeAudit({
+      event: "query",
+      userId,
+      mode,
+      question,
+      sql: validation.sql,
+      ok: false,
+      error: validation.error,
+      latencyMs: Math.round(performance.now() - started),
+    });
     return NextResponse.json({
       ok: false,
       question,
@@ -57,6 +79,16 @@ export async function POST(request: Request) {
 
   const permission = canReadSql(userId, validation.sql);
   if (!permission.ok) {
+    writeAudit({
+      event: "query",
+      userId,
+      mode,
+      question,
+      sql: validation.sql,
+      ok: false,
+      error: permission.error,
+      latencyMs: Math.round(performance.now() - started),
+    });
     return NextResponse.json({
       ok: false,
       question,
@@ -73,6 +105,17 @@ export async function POST(request: Request) {
   try {
     const limitedSql = addDefaultLimit(validation.sql, Number(process.env.MCP_MAX_ROWS || 200));
     const rows = await runQuery(limitedSql);
+    writeAudit({
+      event: "query",
+      userId,
+      mode,
+      question,
+      sql: limitedSql,
+      ok: true,
+      error: null,
+      latencyMs: Math.round(performance.now() - started),
+      rowCount: rows.length,
+    });
     return NextResponse.json({
       ok: true,
       question,
@@ -85,6 +128,16 @@ export async function POST(request: Request) {
       error: null,
     });
   } catch (error) {
+    writeAudit({
+      event: "query",
+      userId,
+      mode,
+      question,
+      sql: validation.sql,
+      ok: false,
+      error: error instanceof Error ? error.message : "query_failed",
+      latencyMs: Math.round(performance.now() - started),
+    });
     return NextResponse.json({
       ok: false,
       question,

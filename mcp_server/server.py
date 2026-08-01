@@ -1,9 +1,11 @@
 import json
 from pathlib import Path
+import time
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from audit import write_audit
 from config import get_settings
 from database import Database
 from permissions import can_read_sql, filter_schema_for_user, list_users
@@ -64,6 +66,7 @@ def get_schema(user_id: str | None = None) -> dict[str, Any]:
 @mcp.tool()
 def validate_readonly_sql(sql: str, user_id: str | None = None) -> dict[str, Any]:
     """Validate that SQL is a safe single-statement SELECT over MVP healthcare tables."""
+    started = time.perf_counter()
     is_valid, normalized_sql, validation_error = validate_sql(sql)
     if is_valid:
         is_allowed, permission_error = can_read_sql(user_id, normalized_sql)
@@ -72,7 +75,7 @@ def validate_readonly_sql(sql: str, user_id: str | None = None) -> dict[str, Any
             validation_error = permission_error
 
     limited_sql = add_default_limit(normalized_sql, settings.max_rows) if is_valid else normalized_sql
-    return {
+    result = {
         "is_valid": is_valid,
         "user_id": user_id,
         "sql": normalized_sql,
@@ -80,6 +83,17 @@ def validate_readonly_sql(sql: str, user_id: str | None = None) -> dict[str, Any
         "error": validation_error,
         "max_rows": settings.max_rows,
     }
+    write_audit(
+        {
+            "event": "validate_readonly_sql",
+            "userId": user_id,
+            "sql": normalized_sql,
+            "ok": is_valid,
+            "error": validation_error,
+            "latencyMs": int((time.perf_counter() - started) * 1000),
+        }
+    )
+    return result
 
 
 @mcp.tool()
@@ -117,8 +131,19 @@ def check_sql_syntax(sql: str, user_id: str | None = None) -> dict[str, Any]:
 @mcp.tool()
 def run_readonly_query(sql: str, user_id: str | None = None) -> dict[str, Any]:
     """Validate and run a read-only PostgreSQL SELECT query with a default row limit."""
+    started = time.perf_counter()
     validation = validate_readonly_sql(sql, user_id)
     if not validation["is_valid"]:
+        write_audit(
+            {
+                "event": "run_readonly_query",
+                "userId": user_id,
+                "sql": validation["sql"],
+                "ok": False,
+                "error": validation["error"],
+                "latencyMs": int((time.perf_counter() - started) * 1000),
+            }
+        )
         return {
             "ok": False,
             "user_id": user_id,
@@ -132,6 +157,17 @@ def run_readonly_query(sql: str, user_id: str | None = None) -> dict[str, Any]:
     limited_sql = add_default_limit(normalized_sql, settings.max_rows)
     rows = database.query(limited_sql)
     explanation = explain_rows(rows)
+    write_audit(
+        {
+            "event": "run_readonly_query",
+            "userId": user_id,
+            "sql": limited_sql,
+            "ok": True,
+            "error": None,
+            "rowCount": len(rows),
+            "latencyMs": int((time.perf_counter() - started) * 1000),
+        }
+    )
     return {
         "ok": True,
         "user_id": user_id,

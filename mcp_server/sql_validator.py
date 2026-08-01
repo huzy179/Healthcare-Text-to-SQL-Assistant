@@ -19,9 +19,26 @@ BLOCKED_KEYWORDS = {
     "revoke",
     "call",
     "execute",
+    "merge",
+    "vacuum",
+    "analyze",
+    "listen",
+    "notify",
 }
 
 SCHEMA_METADATA_FILE = Path(__file__).resolve().parent / "schema_metadata.json"
+HEAVY_TABLES = {"observations", "procedures", "claims", "encounters", "medications"}
+DANGEROUS_FUNCTIONS = {
+    "dblink",
+    "dblink_connect",
+    "lo_export",
+    "lo_import",
+    "pg_sleep",
+    "pg_read_binary_file",
+    "pg_read_file",
+    "pg_stat_file",
+    "pg_terminate_backend",
+}
 
 
 def known_tables() -> set[str]:
@@ -40,6 +57,10 @@ def strip_code_fence(sql: str) -> str:
 def normalize_sql(sql: str) -> str:
     cleaned = strip_code_fence(sql).strip()
     return re.sub(r";+\s*$", "", cleaned)
+
+
+def has_comment(sql: str) -> bool:
+    return bool(re.search(r"(--|/\*)", sql))
 
 
 def parse_select(sql: str) -> tuple[exp.Expression | None, str | None]:
@@ -110,12 +131,40 @@ def referenced_stars(sql: str) -> set[str | None]:
     return stars
 
 
+def referenced_functions(expression: exp.Expression) -> set[str]:
+    functions: set[str] = set()
+    for node in expression.find_all(exp.Anonymous):
+        functions.add(node.name.lower())
+    for node in expression.find_all(exp.Func):
+        functions.add(node.key.lower())
+    return functions
+
+
+def has_aggregate(expression: exp.Expression) -> bool:
+    return any(True for _ in expression.find_all(exp.AggFunc))
+
+
+def has_limit_expression(expression: exp.Expression) -> bool:
+    return expression.args.get("limit") is not None
+
+
+def is_potentially_heavy(expression: exp.Expression) -> bool:
+    tables = {table.name.lower() for table in expression.find_all(exp.Table)}
+    if not tables & HEAVY_TABLES:
+        return False
+    if has_limit_expression(expression) or has_aggregate(expression):
+        return False
+    return True
+
+
 def validate_sql(sql: str) -> tuple[bool, str, str | None]:
     cleaned = normalize_sql(sql)
     lowered = cleaned.lower()
 
     if not cleaned:
         return False, cleaned, "empty_sql"
+    if has_comment(cleaned):
+        return False, cleaned, "comment_not_allowed"
 
     for keyword in BLOCKED_KEYWORDS:
         if re.search(rf"\b{keyword}\b", lowered):
@@ -130,6 +179,13 @@ def validate_sql(sql: str) -> tuple[bool, str, str | None]:
     unknown_tables = sorted(referenced_tables(cleaned) - known_tables())
     if unknown_tables:
         return False, cleaned, "unknown_table:" + ",".join(unknown_tables)
+
+    dangerous_functions = sorted(referenced_functions(expression) & DANGEROUS_FUNCTIONS)
+    if dangerous_functions:
+        return False, cleaned, "dangerous_function:" + ",".join(dangerous_functions)
+
+    if is_potentially_heavy(expression):
+        return False, cleaned, "query_too_heavy:add_limit_or_aggregate"
 
     return True, cleaned, None
 

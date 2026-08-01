@@ -6,7 +6,7 @@ EVAL_SERVICE ?= eval
 FRONTEND_SERVICE ?= frontend
 VLLM_SERVICE ?= vllm
 
-.PHONY: help setup env-check build build-frontend dev frontend recreate-frontend frontend-vllm frontend-logs vllm vllm-logs health docker-desktop-up docker-desktop-health up down ps logs db-shell check-tables sample-queries verify-joins mcp eval eval-gold generate-sql eval-generated eval-llm docker-desktop-eval-llm test-rbac local-eval clean reset-db
+.PHONY: help setup env-check build build-frontend dev frontend recreate-frontend frontend-vllm frontend-logs vllm vllm-logs health docker-desktop-up docker-desktop-health up down ps logs db-shell check-tables sample-queries verify-joins mcp eval eval-gold generate-sql eval-generated eval-llm eval-safety benchmark docker-desktop-eval-llm docker-desktop-benchmark test-rbac local-eval clean reset-db
 
 help:
 	@printf "Healthcare Text-to-SQL MCP commands\n\n"
@@ -30,6 +30,8 @@ help:
 	@printf "  make check-tables       Check imported table row counts\n"
 	@printf "  make eval-gold          Validate reference SQL, DB, and validator\n"
 	@printf "  make eval-llm           Generate SQL with vLLM, then evaluate it\n"
+	@printf "  make eval-safety        Prove unsafe SQL rejection behavior\n"
+	@printf "  make benchmark          Run eval-gold, eval-llm, eval-safety, summary\n"
 	@printf "  make test-rbac          Smoke test table/column permission rules\n"
 
 setup:
@@ -125,8 +127,17 @@ eval-generated:
 
 eval-llm: generate-sql eval-generated
 
+eval-safety:
+	$(COMPOSE) run --rm $(EVAL_SERVICE) python scripts/evaluate_sql_safety.py
+
+benchmark: eval-gold eval-llm eval-safety
+	$(COMPOSE) run --rm $(EVAL_SERVICE) python scripts/write_benchmark_summary.py
+
 docker-desktop-eval-llm:
 	$(MAKE) COMPOSE="$(DOCKER_DESKTOP_COMPOSE)" eval-llm
+
+docker-desktop-benchmark:
+	$(MAKE) COMPOSE="$(DOCKER_DESKTOP_COMPOSE)" benchmark
 
 test-rbac:
 	$(COMPOSE) run --rm $(EVAL_SERVICE) python -c "import sys; sys.path.append('/app/mcp_server'); from permissions import can_read_sql; tests=[('staff','SELECT ssn FROM patients'),('staff','SELECT * FROM patients'),('admin','SELECT * FROM patients'),('user','SELECT * FROM patients'),('user','SELECT COUNT(*) FROM encounters')]; [print(t, can_read_sql(*t)) for t in tests]"
