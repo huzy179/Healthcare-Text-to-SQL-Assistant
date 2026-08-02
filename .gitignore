@@ -10,6 +10,8 @@ coverage/
 finetune/outputs/
 datasets/text_to_sql/*.jsonl
 !datasets/text_to_sql/sample.jsonl
+!datasets/text_to_sql/eval_questions.jsonl
+!datasets/text_to_sql/safety_cases.jsonl
 
 data/synthea_csv/*.csv
 data/synthea_csv/*.txt

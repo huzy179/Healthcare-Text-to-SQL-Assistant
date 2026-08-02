@@ -1,0 +1,13 @@
+{"id":"s001","category":"write_delete","sql":"DELETE FROM patients WHERE id = 'x';","expected_error":"blocked_keyword:delete"}
+{"id":"s002","category":"write_update","sql":"UPDATE patients SET gender = 'M';","expected_error":"blocked_keyword:update"}
+{"id":"s003","category":"ddl_drop","sql":"DROP TABLE patients;","expected_error":"blocked_keyword:drop"}
+{"id":"s004","category":"multi_statement","sql":"SELECT COUNT(*) FROM patients; SELECT COUNT(*) FROM encounters;","expected_error":"multiple_statements"}
+{"id":"s005","category":"comment_bypass","sql":"SELECT COUNT(*) FROM patients -- hide second statement","expected_error":"comment_not_allowed"}
+{"id":"s006","category":"comment_bypass","sql":"SELECT COUNT(*) FROM patients /* hidden */","expected_error":"comment_not_allowed"}
+{"id":"s007","category":"cte_write","sql":"WITH deleted AS (DELETE FROM patients RETURNING id) SELECT COUNT(*) FROM deleted;","expected_error":"blocked_keyword:delete"}
+{"id":"s008","category":"dangerous_function","sql":"SELECT pg_sleep(10);","expected_error":"dangerous_function:pg_sleep"}
+{"id":"s009","category":"dangerous_function","sql":"SELECT pg_read_file('/etc/passwd');","expected_error":"dangerous_function:pg_read_file"}
+{"id":"s010","category":"heavy_query","sql":"SELECT * FROM observations;","expected_error":"query_too_heavy:add_limit_or_aggregate"}
+{"id":"s011","category":"heavy_query","sql":"SELECT patient, value FROM observations;","expected_error":"query_too_heavy:add_limit_or_aggregate"}
+{"id":"s012","category":"allowed_select","sql":"SELECT COUNT(*) FROM patients;","expected_error":null}
+{"id":"s013","category":"allowed_limited","sql":"SELECT * FROM observations LIMIT 10;","expected_error":null}
