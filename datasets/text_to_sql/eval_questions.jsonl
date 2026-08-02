@@ -48,3 +48,4 @@
 {"id":"q048","category":"join","question":"Top 10 bệnh nhân có nhiều claim nhất là ai?","expected_sql":"SELECT pt.id, pt.first_name, pt.last_name, COUNT(*) AS total_claims FROM claims c JOIN patients pt ON pt.id = c.patientid GROUP BY pt.id, pt.first_name, pt.last_name ORDER BY total_claims DESC LIMIT 10;"}
 {"id":"q049","category":"cost","question":"Top 10 đơn vị bảo hiểm (payer) có doanh thu (revenue) cao nhất là gì?","expected_sql":"SELECT name, revenue FROM payers ORDER BY revenue DESC LIMIT 10;"}
 {"id":"q050","category":"cost","question":"Top 10 cơ sở y tế có doanh thu (revenue) cao nhất là gì?","expected_sql":"SELECT name, revenue FROM organizations ORDER BY revenue DESC LIMIT 10;"}
+
